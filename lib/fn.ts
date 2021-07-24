@@ -1,7 +1,6 @@
-import { readFileSync } from 'fs';
 import { join } from 'path';
 import { yarnDedupe } from '@yarn-tool/yarnlock-dedupe';
-import { readFile, writeFile } from 'fs/promises';
+import { readFileSync, writeFileSync } from 'fs';
 import { findRootLazy } from '@yarn-tool/find-root';
 
 export async function autoDeduplication(cwd?: string)
@@ -13,22 +12,20 @@ export async function autoDeduplication(cwd?: string)
 	{
 		const file = join(rootData.root, 'yarn.lock');
 
-		return readFile(file, 'utf-8')
-			.then(async (data) => {
+		const data = readFileSync(file, 'utf-8');
 
-				let ret = yarnDedupe(data);
+		let ret = yarnDedupe(data);
 
-				if (ret.yarnlock_changed)
-				{
-					await writeFile(file, ret.yarnlock_new);
-				}
+		if (ret.yarnlock_changed)
+		{
+			writeFileSync(file, ret.yarnlock_new);
+		}
 
-				return {
-					...ret,
-					rootData,
-					file,
-				}
-			})
+		return {
+			...ret,
+			rootData,
+			file,
+		}
 	}
 }
 
