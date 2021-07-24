@@ -9,13 +9,17 @@ async function run(): Promise<void>
 		core.debug(new Date().toTimeString())
 		await autoDeduplication()
 			.then(data => {
-				if (data?.yarnlock_changed)
+				if (!data?.file)
+				{
+					core.error(`yarn.lock not exists`)
+				}
+				else if (data?.yarnlock_changed)
 				{
 					core.info('\n' + yarnLockDiff(data.yarnlock_old, data.yarnlock_new))
 				}
-				else if (!data?.file)
+				else
 				{
-					core.error(`yarn.lock not exists`)
+					core.info(`yarn.lock is good`)
 				}
 
 				core.setOutput('yarnlock_changed', !!data?.yarnlock_changed)
