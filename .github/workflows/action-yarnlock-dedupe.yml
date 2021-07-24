@@ -22,6 +22,7 @@ jobs:
       - name: yarn.lock deduplication
         uses: bluelovers/action-yarnlock-dedupe@v1
       - name: commit yarn.lock
+        uses: actions/checkout@v2
         run: |
           git add ./yarn.lock
           git commit -m "chore(deps): yarn.lock deduplication" ./yarn.lock
