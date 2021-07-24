@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.2](https://github.com/bluelovers/action-yarnlock-dedupe/compare/action-yarnlock-dedupe@1.0.1...action-yarnlock-dedupe@1.0.2) (2021-07-24)
+
+
+### 🔖　Miscellaneous
+
+* . ([1ed74ca](https://github.com/bluelovers/action-yarnlock-dedupe/commit/1ed74ca2b6dc0d913c6189dfc22b7b3e8457131e))
+* . ([e91c411](https://github.com/bluelovers/action-yarnlock-dedupe/commit/e91c411597243a663c082a831d09402a22387ec6))
+
+
+
+
+
 ## 1.0.1 (2021-07-24)
 
 
