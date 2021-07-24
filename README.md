@@ -22,4 +22,5 @@ jobs:
         run: |
           git add ./yarn.lock
           git commit -m "chore(deps): yarn.lock deduplication" ./yarn.lock
+          git push --ff
 ```
