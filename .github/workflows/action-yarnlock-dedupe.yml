@@ -20,7 +20,7 @@ jobs:
     #if: "contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - name: yarn.lock deduplication
-        uses: bluelovers/action-yarnlock-dedupe@master
+        uses: bluelovers/action-yarnlock-dedupe@v1
       - name: commit yarn.lock
         run: |
           git add ./yarn.lock
