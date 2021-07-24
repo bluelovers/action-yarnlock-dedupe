@@ -8,4 +8,4 @@ author: 'Your name or organization here'
 #    default: 'default value if applicable'
 runs:
   using: 'node12'
-  main: 'lib/main.js'
+  main: 'dist/index.js'
