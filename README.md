@@ -18,9 +18,13 @@ jobs:
     steps:
       - name: yarn.lock deduplication
         uses: bluelovers/action-yarnlock-dedupe@master
-      - name: echo
+      - name: commit yarn.lock
         run: |
           git add ./yarn.lock
           git commit -m "chore(deps): yarn.lock deduplication" ./yarn.lock
-          git push --ff
+      - name: Push changes
+        if: success()
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
