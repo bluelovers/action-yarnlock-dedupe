@@ -10,7 +10,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.autoDeduplication = void 0;
 const path_1 = __nccwpck_require__(5622);
 const yarnlock_dedupe_1 = __nccwpck_require__(1220);
-const promises_1 = __nccwpck_require__(9225);
+const fs_1 = __nccwpck_require__(5747);
 const find_root_1 = __nccwpck_require__(4278);
 async function autoDeduplication(cwd) {
     const rootData = (0, find_root_1.findRootLazy)({
@@ -18,18 +18,16 @@ async function autoDeduplication(cwd) {
     });
     if (rootData === null || rootData === void 0 ? void 0 : rootData.root) {
         const file = (0, path_1.join)(rootData.root, 'yarn.lock');
-        return (0, promises_1.readFile)(file, 'utf-8')
-            .then(async (data) => {
-            let ret = (0, yarnlock_dedupe_1.yarnDedupe)(data);
-            if (ret.yarnlock_changed) {
-                await (0, promises_1.writeFile)(file, ret.yarnlock_new);
-            }
-            return {
-                ...ret,
-                rootData,
-                file,
-            };
-        });
+        const data = (0, fs_1.readFileSync)(file, 'utf-8');
+        let ret = (0, yarnlock_dedupe_1.yarnDedupe)(data);
+        if (ret.yarnlock_changed) {
+            (0, fs_1.writeFileSync)(file, ret.yarnlock_new);
+        }
+        return {
+            ...ret,
+            rootData,
+            file,
+        };
     }
 }
 exports.autoDeduplication = autoDeduplication;
@@ -65069,14 +65067,6 @@ module.exports = require("events");
 
 "use strict";
 module.exports = require("fs");
-
-/***/ }),
-
-/***/ 9225:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("fs/promises");
 
 /***/ }),
 
