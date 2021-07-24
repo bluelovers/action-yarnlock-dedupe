@@ -24,6 +24,8 @@ jobs:
         uses: bluelovers/action-yarnlock-dedupe@v1
       - name: commit yarn.lock
         run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
           git add ./yarn.lock
           git commit -m "chore(deps): yarn.lock deduplication" ./yarn.lock
       - name: Push changes
