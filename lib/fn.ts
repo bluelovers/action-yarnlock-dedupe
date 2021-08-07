@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { yarnDedupe } from '@yarn-tool/yarnlock-dedupe';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { findRootLazy } from '@yarn-tool/find-root';
 
 export async function autoDeduplication(cwd?: string)
@@ -12,20 +12,27 @@ export async function autoDeduplication(cwd?: string)
 	{
 		const file = join(rootData.root, 'yarn.lock');
 
-		const data = readFileSync(file, 'utf-8');
-
-		let ret = yarnDedupe(data);
-
-		if (ret.yarnlock_changed)
+		if (existsSync(file))
 		{
-			writeFileSync(file, ret.yarnlock_new);
+			const data = readFileSync(file, 'utf-8');
+
+			let ret = yarnDedupe(data);
+
+			if (ret.yarnlock_changed)
+			{
+				writeFileSync(file, ret.yarnlock_new);
+			}
+
+			return {
+				...ret,
+				rootData,
+				file,
+			}
 		}
 
 		return {
-			...ret,
 			rootData,
-			file,
-		}
+		} as null
 	}
 }
 
