@@ -18,15 +18,20 @@ async function autoDeduplication(cwd) {
     });
     if (rootData === null || rootData === void 0 ? void 0 : rootData.root) {
         const file = (0, path_1.join)(rootData.root, 'yarn.lock');
-        const data = (0, fs_1.readFileSync)(file, 'utf-8');
-        let ret = (0, yarnlock_dedupe_1.yarnDedupe)(data);
-        if (ret.yarnlock_changed) {
-            (0, fs_1.writeFileSync)(file, ret.yarnlock_new);
+        if ((0, fs_1.existsSync)(file)) {
+            const data = (0, fs_1.readFileSync)(file, 'utf-8');
+            let ret = (0, yarnlock_dedupe_1.yarnDedupe)(data);
+            if (ret.yarnlock_changed) {
+                (0, fs_1.writeFileSync)(file, ret.yarnlock_new);
+            }
+            return {
+                ...ret,
+                rootData,
+                file,
+            };
         }
         return {
-            ...ret,
             rootData,
-            file,
         };
     }
 }
@@ -65184,16 +65189,17 @@ async function run() {
         core.debug(new Date().toTimeString());
         await (0, fn_1.autoDeduplication)()
             .then(data => {
-            if (!(data === null || data === void 0 ? void 0 : data.file)) {
+            data !== null && data !== void 0 ? data : (data = {});
+            if (!data.file) {
                 core.error(`yarn.lock not exists`);
             }
-            else if (data === null || data === void 0 ? void 0 : data.yarnlock_changed) {
+            else if (data.yarnlock_changed) {
                 core.info('\n' + (0, yarnlock_diff_1.default)(data.yarnlock_old, data.yarnlock_new));
             }
             else {
                 core.info(`yarn.lock is good`);
             }
-            core.setOutput('yarnlock_changed', !!(data === null || data === void 0 ? void 0 : data.yarnlock_changed));
+            core.setOutput('yarnlock_changed', !!data.yarnlock_changed);
         });
         core.debug(new Date().toTimeString());
         core.setOutput('time', new Date().toTimeString());

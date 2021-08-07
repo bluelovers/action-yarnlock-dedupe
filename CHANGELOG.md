@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.3](https://github.com/bluelovers/action-yarnlock-dedupe/compare/action-yarnlock-dedupe@1.0.2...action-yarnlock-dedupe@1.0.3) (2021-08-07)
+
+
+### 🐛　Bug Fixes
+
+* ENOENT: no such file or directory, open 'yarn.lock' ([c3c3c35](https://github.com/bluelovers/action-yarnlock-dedupe/commit/c3c3c35c872d06ee6a186f744a66cdb23c593bbc))
+* demo ([e459cb0](https://github.com/bluelovers/action-yarnlock-dedupe/commit/e459cb03d607436f06b8e26c36f5fab82eb1b7f5))
+
+
+### 🔖　Miscellaneous
+
+* . ([47c826c](https://github.com/bluelovers/action-yarnlock-dedupe/commit/47c826cf04c479da95cb45a76c7dc72029c3e3ee))
+* . ([7a123e9](https://github.com/bluelovers/action-yarnlock-dedupe/commit/7a123e90948855a7ac35185d2127f59d2a41d6f9))
+* . ([bf148b4](https://github.com/bluelovers/action-yarnlock-dedupe/commit/bf148b4ded710c89d7fd5e3067401eb90a22f962))
+* . ([44584eb](https://github.com/bluelovers/action-yarnlock-dedupe/commit/44584eb2809d1af45c8bb7e0145edd5c8d8d6734))
+* . ([059c60a](https://github.com/bluelovers/action-yarnlock-dedupe/commit/059c60a6301de6ec6c5281445a6fe6637bf4e493))
+
+
+
+
+
 ## [1.0.2](https://github.com/bluelovers/action-yarnlock-dedupe/compare/action-yarnlock-dedupe@1.0.1...action-yarnlock-dedupe@1.0.2) (2021-07-24)
 
 
