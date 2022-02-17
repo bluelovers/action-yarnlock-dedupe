@@ -8,9 +8,9 @@ require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.autoDeduplication = void 0;
-const path_1 = __nccwpck_require__(5622);
+const path_1 = __nccwpck_require__(1017);
 const yarnlock_dedupe_1 = __nccwpck_require__(1220);
-const fs_1 = __nccwpck_require__(5747);
+const fs_1 = __nccwpck_require__(7147);
 const find_root_1 = __nccwpck_require__(4278);
 async function autoDeduplication(cwd) {
     const rootData = (0, find_root_1.findRootLazy)({
@@ -66,7 +66,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.issue = exports.issueCommand = void 0;
-const os = __importStar(__nccwpck_require__(2087));
+const os = __importStar(__nccwpck_require__(2037));
 const utils_1 = __nccwpck_require__(5278);
 /**
  * Commands
@@ -173,12 +173,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
+exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
 const command_1 = __nccwpck_require__(7351);
 const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
-const os = __importStar(__nccwpck_require__(2087));
-const path = __importStar(__nccwpck_require__(5622));
+const os = __importStar(__nccwpck_require__(2037));
+const path = __importStar(__nccwpck_require__(1017));
+const oidc_utils_1 = __nccwpck_require__(8041);
 /**
  * The code to exit an action
  */
@@ -351,19 +352,30 @@ exports.debug = debug;
 /**
  * Adds an error issue
  * @param message error issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function error(message) {
-    command_1.issue('error', message instanceof Error ? message.toString() : message);
+function error(message, properties = {}) {
+    command_1.issueCommand('error', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.error = error;
 /**
- * Adds an warning issue
+ * Adds a warning issue
  * @param message warning issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
  */
-function warning(message) {
-    command_1.issue('warning', message instanceof Error ? message.toString() : message);
+function warning(message, properties = {}) {
+    command_1.issueCommand('warning', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 exports.warning = warning;
+/**
+ * Adds a notice issue
+ * @param message notice issue message. Errors will be converted to string via toString()
+ * @param properties optional properties to add to the annotation.
+ */
+function notice(message, properties = {}) {
+    command_1.issueCommand('notice', utils_1.toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+exports.notice = notice;
 /**
  * Writes info to log with console.log.
  * @param message info message
@@ -436,6 +448,12 @@ function getState(name) {
     return process.env[`STATE_${name}`] || '';
 }
 exports.getState = getState;
+function getIDToken(aud) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return yield oidc_utils_1.OidcClient.getIDToken(aud);
+    });
+}
+exports.getIDToken = getIDToken;
 //# sourceMappingURL=core.js.map
 
 /***/ }),
@@ -469,8 +487,8 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.issueCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const fs = __importStar(__nccwpck_require__(5747));
-const os = __importStar(__nccwpck_require__(2087));
+const fs = __importStar(__nccwpck_require__(7147));
+const os = __importStar(__nccwpck_require__(2037));
 const utils_1 = __nccwpck_require__(5278);
 function issueCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
@@ -489,6 +507,90 @@ exports.issueCommand = issueCommand;
 
 /***/ }),
 
+/***/ 8041:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.OidcClient = void 0;
+const http_client_1 = __nccwpck_require__(9925);
+const auth_1 = __nccwpck_require__(3702);
+const core_1 = __nccwpck_require__(2186);
+class OidcClient {
+    static createHttpClient(allowRetry = true, maxRetry = 10) {
+        const requestOptions = {
+            allowRetries: allowRetry,
+            maxRetries: maxRetry
+        };
+        return new http_client_1.HttpClient('actions/oidc-client', [new auth_1.BearerCredentialHandler(OidcClient.getRequestToken())], requestOptions);
+    }
+    static getRequestToken() {
+        const token = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
+        if (!token) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_TOKEN env variable');
+        }
+        return token;
+    }
+    static getIDTokenUrl() {
+        const runtimeUrl = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
+        if (!runtimeUrl) {
+            throw new Error('Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable');
+        }
+        return runtimeUrl;
+    }
+    static getCall(id_token_url) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const httpclient = OidcClient.createHttpClient();
+            const res = yield httpclient
+                .getJson(id_token_url)
+                .catch(error => {
+                throw new Error(`Failed to get ID Token. \n 
+        Error Code : ${error.statusCode}\n 
+        Error Message: ${error.result.message}`);
+            });
+            const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
+            if (!id_token) {
+                throw new Error('Response json body do not have ID Token field');
+            }
+            return id_token;
+        });
+    }
+    static getIDToken(audience) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // New ID Token is requested from action service
+                let id_token_url = OidcClient.getIDTokenUrl();
+                if (audience) {
+                    const encodedAudience = encodeURIComponent(audience);
+                    id_token_url = `${id_token_url}&audience=${encodedAudience}`;
+                }
+                core_1.debug(`ID token url is ${id_token_url}`);
+                const id_token = yield OidcClient.getCall(id_token_url);
+                core_1.setSecret(id_token);
+                return id_token;
+            }
+            catch (error) {
+                throw new Error(`Error message: ${error.message}`);
+            }
+        });
+    }
+}
+exports.OidcClient = OidcClient;
+//# sourceMappingURL=oidc-utils.js.map
+
+/***/ }),
+
 /***/ 5278:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -497,7 +599,7 @@ exports.issueCommand = issueCommand;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.toCommandValue = void 0;
+exports.toCommandProperties = exports.toCommandValue = void 0;
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -512,7 +614,703 @@ function toCommandValue(input) {
     return JSON.stringify(input);
 }
 exports.toCommandValue = toCommandValue;
+/**
+ *
+ * @param annotationProperties
+ * @returns The command properties to send with the actual annotation command
+ * See IssueCommandProperties: https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionCommandManager.cs#L646
+ */
+function toCommandProperties(annotationProperties) {
+    if (!Object.keys(annotationProperties).length) {
+        return {};
+    }
+    return {
+        title: annotationProperties.title,
+        file: annotationProperties.file,
+        line: annotationProperties.startLine,
+        endLine: annotationProperties.endLine,
+        col: annotationProperties.startColumn,
+        endColumn: annotationProperties.endColumn
+    };
+}
+exports.toCommandProperties = toCommandProperties;
 //# sourceMappingURL=utils.js.map
+
+/***/ }),
+
+/***/ 3702:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+class BasicCredentialHandler {
+    constructor(username, password) {
+        this.username = username;
+        this.password = password;
+    }
+    prepareRequest(options) {
+        options.headers['Authorization'] =
+            'Basic ' +
+                Buffer.from(this.username + ':' + this.password).toString('base64');
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication(response) {
+        return false;
+    }
+    handleAuthentication(httpClient, requestInfo, objs) {
+        return null;
+    }
+}
+exports.BasicCredentialHandler = BasicCredentialHandler;
+class BearerCredentialHandler {
+    constructor(token) {
+        this.token = token;
+    }
+    // currently implements pre-authorization
+    // TODO: support preAuth = false where it hooks on 401
+    prepareRequest(options) {
+        options.headers['Authorization'] = 'Bearer ' + this.token;
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication(response) {
+        return false;
+    }
+    handleAuthentication(httpClient, requestInfo, objs) {
+        return null;
+    }
+}
+exports.BearerCredentialHandler = BearerCredentialHandler;
+class PersonalAccessTokenCredentialHandler {
+    constructor(token) {
+        this.token = token;
+    }
+    // currently implements pre-authorization
+    // TODO: support preAuth = false where it hooks on 401
+    prepareRequest(options) {
+        options.headers['Authorization'] =
+            'Basic ' + Buffer.from('PAT:' + this.token).toString('base64');
+    }
+    // This handler cannot handle 401
+    canHandleAuthentication(response) {
+        return false;
+    }
+    handleAuthentication(httpClient, requestInfo, objs) {
+        return null;
+    }
+}
+exports.PersonalAccessTokenCredentialHandler = PersonalAccessTokenCredentialHandler;
+
+
+/***/ }),
+
+/***/ 9925:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const http = __nccwpck_require__(3685);
+const https = __nccwpck_require__(5687);
+const pm = __nccwpck_require__(6443);
+let tunnel;
+var HttpCodes;
+(function (HttpCodes) {
+    HttpCodes[HttpCodes["OK"] = 200] = "OK";
+    HttpCodes[HttpCodes["MultipleChoices"] = 300] = "MultipleChoices";
+    HttpCodes[HttpCodes["MovedPermanently"] = 301] = "MovedPermanently";
+    HttpCodes[HttpCodes["ResourceMoved"] = 302] = "ResourceMoved";
+    HttpCodes[HttpCodes["SeeOther"] = 303] = "SeeOther";
+    HttpCodes[HttpCodes["NotModified"] = 304] = "NotModified";
+    HttpCodes[HttpCodes["UseProxy"] = 305] = "UseProxy";
+    HttpCodes[HttpCodes["SwitchProxy"] = 306] = "SwitchProxy";
+    HttpCodes[HttpCodes["TemporaryRedirect"] = 307] = "TemporaryRedirect";
+    HttpCodes[HttpCodes["PermanentRedirect"] = 308] = "PermanentRedirect";
+    HttpCodes[HttpCodes["BadRequest"] = 400] = "BadRequest";
+    HttpCodes[HttpCodes["Unauthorized"] = 401] = "Unauthorized";
+    HttpCodes[HttpCodes["PaymentRequired"] = 402] = "PaymentRequired";
+    HttpCodes[HttpCodes["Forbidden"] = 403] = "Forbidden";
+    HttpCodes[HttpCodes["NotFound"] = 404] = "NotFound";
+    HttpCodes[HttpCodes["MethodNotAllowed"] = 405] = "MethodNotAllowed";
+    HttpCodes[HttpCodes["NotAcceptable"] = 406] = "NotAcceptable";
+    HttpCodes[HttpCodes["ProxyAuthenticationRequired"] = 407] = "ProxyAuthenticationRequired";
+    HttpCodes[HttpCodes["RequestTimeout"] = 408] = "RequestTimeout";
+    HttpCodes[HttpCodes["Conflict"] = 409] = "Conflict";
+    HttpCodes[HttpCodes["Gone"] = 410] = "Gone";
+    HttpCodes[HttpCodes["TooManyRequests"] = 429] = "TooManyRequests";
+    HttpCodes[HttpCodes["InternalServerError"] = 500] = "InternalServerError";
+    HttpCodes[HttpCodes["NotImplemented"] = 501] = "NotImplemented";
+    HttpCodes[HttpCodes["BadGateway"] = 502] = "BadGateway";
+    HttpCodes[HttpCodes["ServiceUnavailable"] = 503] = "ServiceUnavailable";
+    HttpCodes[HttpCodes["GatewayTimeout"] = 504] = "GatewayTimeout";
+})(HttpCodes = exports.HttpCodes || (exports.HttpCodes = {}));
+var Headers;
+(function (Headers) {
+    Headers["Accept"] = "accept";
+    Headers["ContentType"] = "content-type";
+})(Headers = exports.Headers || (exports.Headers = {}));
+var MediaTypes;
+(function (MediaTypes) {
+    MediaTypes["ApplicationJson"] = "application/json";
+})(MediaTypes = exports.MediaTypes || (exports.MediaTypes = {}));
+/**
+ * Returns the proxy URL, depending upon the supplied url and proxy environment variables.
+ * @param serverUrl  The server URL where the request will be sent. For example, https://api.github.com
+ */
+function getProxyUrl(serverUrl) {
+    let proxyUrl = pm.getProxyUrl(new URL(serverUrl));
+    return proxyUrl ? proxyUrl.href : '';
+}
+exports.getProxyUrl = getProxyUrl;
+const HttpRedirectCodes = [
+    HttpCodes.MovedPermanently,
+    HttpCodes.ResourceMoved,
+    HttpCodes.SeeOther,
+    HttpCodes.TemporaryRedirect,
+    HttpCodes.PermanentRedirect
+];
+const HttpResponseRetryCodes = [
+    HttpCodes.BadGateway,
+    HttpCodes.ServiceUnavailable,
+    HttpCodes.GatewayTimeout
+];
+const RetryableHttpVerbs = ['OPTIONS', 'GET', 'DELETE', 'HEAD'];
+const ExponentialBackoffCeiling = 10;
+const ExponentialBackoffTimeSlice = 5;
+class HttpClientError extends Error {
+    constructor(message, statusCode) {
+        super(message);
+        this.name = 'HttpClientError';
+        this.statusCode = statusCode;
+        Object.setPrototypeOf(this, HttpClientError.prototype);
+    }
+}
+exports.HttpClientError = HttpClientError;
+class HttpClientResponse {
+    constructor(message) {
+        this.message = message;
+    }
+    readBody() {
+        return new Promise(async (resolve, reject) => {
+            let output = Buffer.alloc(0);
+            this.message.on('data', (chunk) => {
+                output = Buffer.concat([output, chunk]);
+            });
+            this.message.on('end', () => {
+                resolve(output.toString());
+            });
+        });
+    }
+}
+exports.HttpClientResponse = HttpClientResponse;
+function isHttps(requestUrl) {
+    let parsedUrl = new URL(requestUrl);
+    return parsedUrl.protocol === 'https:';
+}
+exports.isHttps = isHttps;
+class HttpClient {
+    constructor(userAgent, handlers, requestOptions) {
+        this._ignoreSslError = false;
+        this._allowRedirects = true;
+        this._allowRedirectDowngrade = false;
+        this._maxRedirects = 50;
+        this._allowRetries = false;
+        this._maxRetries = 1;
+        this._keepAlive = false;
+        this._disposed = false;
+        this.userAgent = userAgent;
+        this.handlers = handlers || [];
+        this.requestOptions = requestOptions;
+        if (requestOptions) {
+            if (requestOptions.ignoreSslError != null) {
+                this._ignoreSslError = requestOptions.ignoreSslError;
+            }
+            this._socketTimeout = requestOptions.socketTimeout;
+            if (requestOptions.allowRedirects != null) {
+                this._allowRedirects = requestOptions.allowRedirects;
+            }
+            if (requestOptions.allowRedirectDowngrade != null) {
+                this._allowRedirectDowngrade = requestOptions.allowRedirectDowngrade;
+            }
+            if (requestOptions.maxRedirects != null) {
+                this._maxRedirects = Math.max(requestOptions.maxRedirects, 0);
+            }
+            if (requestOptions.keepAlive != null) {
+                this._keepAlive = requestOptions.keepAlive;
+            }
+            if (requestOptions.allowRetries != null) {
+                this._allowRetries = requestOptions.allowRetries;
+            }
+            if (requestOptions.maxRetries != null) {
+                this._maxRetries = requestOptions.maxRetries;
+            }
+        }
+    }
+    options(requestUrl, additionalHeaders) {
+        return this.request('OPTIONS', requestUrl, null, additionalHeaders || {});
+    }
+    get(requestUrl, additionalHeaders) {
+        return this.request('GET', requestUrl, null, additionalHeaders || {});
+    }
+    del(requestUrl, additionalHeaders) {
+        return this.request('DELETE', requestUrl, null, additionalHeaders || {});
+    }
+    post(requestUrl, data, additionalHeaders) {
+        return this.request('POST', requestUrl, data, additionalHeaders || {});
+    }
+    patch(requestUrl, data, additionalHeaders) {
+        return this.request('PATCH', requestUrl, data, additionalHeaders || {});
+    }
+    put(requestUrl, data, additionalHeaders) {
+        return this.request('PUT', requestUrl, data, additionalHeaders || {});
+    }
+    head(requestUrl, additionalHeaders) {
+        return this.request('HEAD', requestUrl, null, additionalHeaders || {});
+    }
+    sendStream(verb, requestUrl, stream, additionalHeaders) {
+        return this.request(verb, requestUrl, stream, additionalHeaders);
+    }
+    /**
+     * Gets a typed object from an endpoint
+     * Be aware that not found returns a null.  Other errors (4xx, 5xx) reject the promise
+     */
+    async getJson(requestUrl, additionalHeaders = {}) {
+        additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+        let res = await this.get(requestUrl, additionalHeaders);
+        return this._processResponse(res, this.requestOptions);
+    }
+    async postJson(requestUrl, obj, additionalHeaders = {}) {
+        let data = JSON.stringify(obj, null, 2);
+        additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+        additionalHeaders[Headers.ContentType] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.ContentType, MediaTypes.ApplicationJson);
+        let res = await this.post(requestUrl, data, additionalHeaders);
+        return this._processResponse(res, this.requestOptions);
+    }
+    async putJson(requestUrl, obj, additionalHeaders = {}) {
+        let data = JSON.stringify(obj, null, 2);
+        additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+        additionalHeaders[Headers.ContentType] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.ContentType, MediaTypes.ApplicationJson);
+        let res = await this.put(requestUrl, data, additionalHeaders);
+        return this._processResponse(res, this.requestOptions);
+    }
+    async patchJson(requestUrl, obj, additionalHeaders = {}) {
+        let data = JSON.stringify(obj, null, 2);
+        additionalHeaders[Headers.Accept] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.Accept, MediaTypes.ApplicationJson);
+        additionalHeaders[Headers.ContentType] = this._getExistingOrDefaultHeader(additionalHeaders, Headers.ContentType, MediaTypes.ApplicationJson);
+        let res = await this.patch(requestUrl, data, additionalHeaders);
+        return this._processResponse(res, this.requestOptions);
+    }
+    /**
+     * Makes a raw http request.
+     * All other methods such as get, post, patch, and request ultimately call this.
+     * Prefer get, del, post and patch
+     */
+    async request(verb, requestUrl, data, headers) {
+        if (this._disposed) {
+            throw new Error('Client has already been disposed.');
+        }
+        let parsedUrl = new URL(requestUrl);
+        let info = this._prepareRequest(verb, parsedUrl, headers);
+        // Only perform retries on reads since writes may not be idempotent.
+        let maxTries = this._allowRetries && RetryableHttpVerbs.indexOf(verb) != -1
+            ? this._maxRetries + 1
+            : 1;
+        let numTries = 0;
+        let response;
+        while (numTries < maxTries) {
+            response = await this.requestRaw(info, data);
+            // Check if it's an authentication challenge
+            if (response &&
+                response.message &&
+                response.message.statusCode === HttpCodes.Unauthorized) {
+                let authenticationHandler;
+                for (let i = 0; i < this.handlers.length; i++) {
+                    if (this.handlers[i].canHandleAuthentication(response)) {
+                        authenticationHandler = this.handlers[i];
+                        break;
+                    }
+                }
+                if (authenticationHandler) {
+                    return authenticationHandler.handleAuthentication(this, info, data);
+                }
+                else {
+                    // We have received an unauthorized response but have no handlers to handle it.
+                    // Let the response return to the caller.
+                    return response;
+                }
+            }
+            let redirectsRemaining = this._maxRedirects;
+            while (HttpRedirectCodes.indexOf(response.message.statusCode) != -1 &&
+                this._allowRedirects &&
+                redirectsRemaining > 0) {
+                const redirectUrl = response.message.headers['location'];
+                if (!redirectUrl) {
+                    // if there's no location to redirect to, we won't
+                    break;
+                }
+                let parsedRedirectUrl = new URL(redirectUrl);
+                if (parsedUrl.protocol == 'https:' &&
+                    parsedUrl.protocol != parsedRedirectUrl.protocol &&
+                    !this._allowRedirectDowngrade) {
+                    throw new Error('Redirect from HTTPS to HTTP protocol. This downgrade is not allowed for security reasons. If you want to allow this behavior, set the allowRedirectDowngrade option to true.');
+                }
+                // we need to finish reading the response before reassigning response
+                // which will leak the open socket.
+                await response.readBody();
+                // strip authorization header if redirected to a different hostname
+                if (parsedRedirectUrl.hostname !== parsedUrl.hostname) {
+                    for (let header in headers) {
+                        // header names are case insensitive
+                        if (header.toLowerCase() === 'authorization') {
+                            delete headers[header];
+                        }
+                    }
+                }
+                // let's make the request with the new redirectUrl
+                info = this._prepareRequest(verb, parsedRedirectUrl, headers);
+                response = await this.requestRaw(info, data);
+                redirectsRemaining--;
+            }
+            if (HttpResponseRetryCodes.indexOf(response.message.statusCode) == -1) {
+                // If not a retry code, return immediately instead of retrying
+                return response;
+            }
+            numTries += 1;
+            if (numTries < maxTries) {
+                await response.readBody();
+                await this._performExponentialBackoff(numTries);
+            }
+        }
+        return response;
+    }
+    /**
+     * Needs to be called if keepAlive is set to true in request options.
+     */
+    dispose() {
+        if (this._agent) {
+            this._agent.destroy();
+        }
+        this._disposed = true;
+    }
+    /**
+     * Raw request.
+     * @param info
+     * @param data
+     */
+    requestRaw(info, data) {
+        return new Promise((resolve, reject) => {
+            let callbackForResult = function (err, res) {
+                if (err) {
+                    reject(err);
+                }
+                resolve(res);
+            };
+            this.requestRawWithCallback(info, data, callbackForResult);
+        });
+    }
+    /**
+     * Raw request with callback.
+     * @param info
+     * @param data
+     * @param onResult
+     */
+    requestRawWithCallback(info, data, onResult) {
+        let socket;
+        if (typeof data === 'string') {
+            info.options.headers['Content-Length'] = Buffer.byteLength(data, 'utf8');
+        }
+        let callbackCalled = false;
+        let handleResult = (err, res) => {
+            if (!callbackCalled) {
+                callbackCalled = true;
+                onResult(err, res);
+            }
+        };
+        let req = info.httpModule.request(info.options, (msg) => {
+            let res = new HttpClientResponse(msg);
+            handleResult(null, res);
+        });
+        req.on('socket', sock => {
+            socket = sock;
+        });
+        // If we ever get disconnected, we want the socket to timeout eventually
+        req.setTimeout(this._socketTimeout || 3 * 60000, () => {
+            if (socket) {
+                socket.end();
+            }
+            handleResult(new Error('Request timeout: ' + info.options.path), null);
+        });
+        req.on('error', function (err) {
+            // err has statusCode property
+            // res should have headers
+            handleResult(err, null);
+        });
+        if (data && typeof data === 'string') {
+            req.write(data, 'utf8');
+        }
+        if (data && typeof data !== 'string') {
+            data.on('close', function () {
+                req.end();
+            });
+            data.pipe(req);
+        }
+        else {
+            req.end();
+        }
+    }
+    /**
+     * Gets an http agent. This function is useful when you need an http agent that handles
+     * routing through a proxy server - depending upon the url and proxy environment variables.
+     * @param serverUrl  The server URL where the request will be sent. For example, https://api.github.com
+     */
+    getAgent(serverUrl) {
+        let parsedUrl = new URL(serverUrl);
+        return this._getAgent(parsedUrl);
+    }
+    _prepareRequest(method, requestUrl, headers) {
+        const info = {};
+        info.parsedUrl = requestUrl;
+        const usingSsl = info.parsedUrl.protocol === 'https:';
+        info.httpModule = usingSsl ? https : http;
+        const defaultPort = usingSsl ? 443 : 80;
+        info.options = {};
+        info.options.host = info.parsedUrl.hostname;
+        info.options.port = info.parsedUrl.port
+            ? parseInt(info.parsedUrl.port)
+            : defaultPort;
+        info.options.path =
+            (info.parsedUrl.pathname || '') + (info.parsedUrl.search || '');
+        info.options.method = method;
+        info.options.headers = this._mergeHeaders(headers);
+        if (this.userAgent != null) {
+            info.options.headers['user-agent'] = this.userAgent;
+        }
+        info.options.agent = this._getAgent(info.parsedUrl);
+        // gives handlers an opportunity to participate
+        if (this.handlers) {
+            this.handlers.forEach(handler => {
+                handler.prepareRequest(info.options);
+            });
+        }
+        return info;
+    }
+    _mergeHeaders(headers) {
+        const lowercaseKeys = obj => Object.keys(obj).reduce((c, k) => ((c[k.toLowerCase()] = obj[k]), c), {});
+        if (this.requestOptions && this.requestOptions.headers) {
+            return Object.assign({}, lowercaseKeys(this.requestOptions.headers), lowercaseKeys(headers));
+        }
+        return lowercaseKeys(headers || {});
+    }
+    _getExistingOrDefaultHeader(additionalHeaders, header, _default) {
+        const lowercaseKeys = obj => Object.keys(obj).reduce((c, k) => ((c[k.toLowerCase()] = obj[k]), c), {});
+        let clientHeader;
+        if (this.requestOptions && this.requestOptions.headers) {
+            clientHeader = lowercaseKeys(this.requestOptions.headers)[header];
+        }
+        return additionalHeaders[header] || clientHeader || _default;
+    }
+    _getAgent(parsedUrl) {
+        let agent;
+        let proxyUrl = pm.getProxyUrl(parsedUrl);
+        let useProxy = proxyUrl && proxyUrl.hostname;
+        if (this._keepAlive && useProxy) {
+            agent = this._proxyAgent;
+        }
+        if (this._keepAlive && !useProxy) {
+            agent = this._agent;
+        }
+        // if agent is already assigned use that agent.
+        if (!!agent) {
+            return agent;
+        }
+        const usingSsl = parsedUrl.protocol === 'https:';
+        let maxSockets = 100;
+        if (!!this.requestOptions) {
+            maxSockets = this.requestOptions.maxSockets || http.globalAgent.maxSockets;
+        }
+        if (useProxy) {
+            // If using proxy, need tunnel
+            if (!tunnel) {
+                tunnel = __nccwpck_require__(4294);
+            }
+            const agentOptions = {
+                maxSockets: maxSockets,
+                keepAlive: this._keepAlive,
+                proxy: {
+                    ...((proxyUrl.username || proxyUrl.password) && {
+                        proxyAuth: `${proxyUrl.username}:${proxyUrl.password}`
+                    }),
+                    host: proxyUrl.hostname,
+                    port: proxyUrl.port
+                }
+            };
+            let tunnelAgent;
+            const overHttps = proxyUrl.protocol === 'https:';
+            if (usingSsl) {
+                tunnelAgent = overHttps ? tunnel.httpsOverHttps : tunnel.httpsOverHttp;
+            }
+            else {
+                tunnelAgent = overHttps ? tunnel.httpOverHttps : tunnel.httpOverHttp;
+            }
+            agent = tunnelAgent(agentOptions);
+            this._proxyAgent = agent;
+        }
+        // if reusing agent across request and tunneling agent isn't assigned create a new agent
+        if (this._keepAlive && !agent) {
+            const options = { keepAlive: this._keepAlive, maxSockets: maxSockets };
+            agent = usingSsl ? new https.Agent(options) : new http.Agent(options);
+            this._agent = agent;
+        }
+        // if not using private agent and tunnel agent isn't setup then use global agent
+        if (!agent) {
+            agent = usingSsl ? https.globalAgent : http.globalAgent;
+        }
+        if (usingSsl && this._ignoreSslError) {
+            // we don't want to set NODE_TLS_REJECT_UNAUTHORIZED=0 since that will affect request for entire process
+            // http.RequestOptions doesn't expose a way to modify RequestOptions.agent.options
+            // we have to cast it to any and change it directly
+            agent.options = Object.assign(agent.options || {}, {
+                rejectUnauthorized: false
+            });
+        }
+        return agent;
+    }
+    _performExponentialBackoff(retryNumber) {
+        retryNumber = Math.min(ExponentialBackoffCeiling, retryNumber);
+        const ms = ExponentialBackoffTimeSlice * Math.pow(2, retryNumber);
+        return new Promise(resolve => setTimeout(() => resolve(), ms));
+    }
+    static dateTimeDeserializer(key, value) {
+        if (typeof value === 'string') {
+            let a = new Date(value);
+            if (!isNaN(a.valueOf())) {
+                return a;
+            }
+        }
+        return value;
+    }
+    async _processResponse(res, options) {
+        return new Promise(async (resolve, reject) => {
+            const statusCode = res.message.statusCode;
+            const response = {
+                statusCode: statusCode,
+                result: null,
+                headers: {}
+            };
+            // not found leads to null obj returned
+            if (statusCode == HttpCodes.NotFound) {
+                resolve(response);
+            }
+            let obj;
+            let contents;
+            // get the result from the body
+            try {
+                contents = await res.readBody();
+                if (contents && contents.length > 0) {
+                    if (options && options.deserializeDates) {
+                        obj = JSON.parse(contents, HttpClient.dateTimeDeserializer);
+                    }
+                    else {
+                        obj = JSON.parse(contents);
+                    }
+                    response.result = obj;
+                }
+                response.headers = res.message.headers;
+            }
+            catch (err) {
+                // Invalid resource (contents not json);  leaving result obj null
+            }
+            // note that 3xx redirects are handled by the http layer.
+            if (statusCode > 299) {
+                let msg;
+                // if exception/error in body, attempt to get better error
+                if (obj && obj.message) {
+                    msg = obj.message;
+                }
+                else if (contents && contents.length > 0) {
+                    // it may be the case that the exception is in the body message as string
+                    msg = contents;
+                }
+                else {
+                    msg = 'Failed request: (' + statusCode + ')';
+                }
+                let err = new HttpClientError(msg, statusCode);
+                err.result = response.result;
+                reject(err);
+            }
+            else {
+                resolve(response);
+            }
+        });
+    }
+}
+exports.HttpClient = HttpClient;
+
+
+/***/ }),
+
+/***/ 6443:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+function getProxyUrl(reqUrl) {
+    let usingSsl = reqUrl.protocol === 'https:';
+    let proxyUrl;
+    if (checkBypass(reqUrl)) {
+        return proxyUrl;
+    }
+    let proxyVar;
+    if (usingSsl) {
+        proxyVar = process.env['https_proxy'] || process.env['HTTPS_PROXY'];
+    }
+    else {
+        proxyVar = process.env['http_proxy'] || process.env['HTTP_PROXY'];
+    }
+    if (proxyVar) {
+        proxyUrl = new URL(proxyVar);
+    }
+    return proxyUrl;
+}
+exports.getProxyUrl = getProxyUrl;
+function checkBypass(reqUrl) {
+    if (!reqUrl.hostname) {
+        return false;
+    }
+    let noProxy = process.env['no_proxy'] || process.env['NO_PROXY'] || '';
+    if (!noProxy) {
+        return false;
+    }
+    // Determine the request port
+    let reqPort;
+    if (reqUrl.port) {
+        reqPort = Number(reqUrl.port);
+    }
+    else if (reqUrl.protocol === 'http:') {
+        reqPort = 80;
+    }
+    else if (reqUrl.protocol === 'https:') {
+        reqPort = 443;
+    }
+    // Format the request hostname and hostname with port
+    let upperReqHosts = [reqUrl.hostname.toUpperCase()];
+    if (typeof reqPort === 'number') {
+        upperReqHosts.push(`${upperReqHosts[0]}:${reqPort}`);
+    }
+    // Compare request host against noproxy
+    for (let upperNoProxyItem of noProxy
+        .split(',')
+        .map(x => x.trim().toUpperCase())
+        .filter(x => x)) {
+        if (upperReqHosts.some(x => x === upperNoProxyItem)) {
+            return true;
+        }
+    }
+    return false;
+}
+exports.checkBypass = checkBypass;
+
 
 /***/ }),
 
@@ -1144,7 +1942,7 @@ exports.applyChange = applyChange;
 exports.applyDiff = applyDiff;
 exports.applyDiffChange = applyDiffChange;
 exports.deepDiff = deepDiff;
-exports.default = deepDiff;
+exports["default"] = deepDiff;
 exports.diff = deepDiff;
 exports.getOrderIndependentHash = getOrderIndependentHash;
 exports.isIDiffNode = isIDiffNode;
@@ -1162,7 +1960,7 @@ exports.revertDiffChange = revertDiffChange;
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
-var e;Object.defineProperty(exports, "__esModule", ({value:!0})),exports.EnumKinds=void 0,(e=exports.EnumKinds||(exports.EnumKinds={})).DiffEdit="E",e.DiffNew="N",e.DiffDeleted="D",e.DiffArray="A";const t=["N","E","A","D"];class n{constructor(e,t){this.kind=e,null!=t&&t.length&&(this.path=t)}}class r extends n{constructor(e,t,n){super("E",e),this.lhs=t,this.rhs=n}}class s extends n{constructor(e,t){super("N",e),this.rhs=t}}class i extends n{constructor(e,t){super("D",e),this.lhs=t}}class o extends n{constructor(e,t,n){super("A",e),this.index=t,this.item=n}}function a(e,t){return e.splice(t,1)}function h(e){const t=typeof e;return"object"!==t?t:e===Math?"math":null===e?"null":Array.isArray(e)?"array":"[object Date]"===Object.prototype.toString.call(e)?"date":"function"==typeof e.toString&&/^\/.*\//.test(e.toString())?"regexp":"object"}function c(e){let t=0;if(0===e.length)return t;for(let n=0;n<e.length;n++)t=(t<<5)-t+e.charCodeAt(n),t&=t;return t}function f(e){let t=0;const n=h(e);if("array"===n){e.forEach((function(e){t+=f(e)}));const r=l(n,{hash:t});return t+c(r)}if("object"===n){for(const r in e)if(e.hasOwnProperty(r)){const s=l(n,{key:r,hash:f(e[r])});t+=c(s)}return t}const r=l(n,{value:e});return t+c(r)}function l(e,t){switch(e){case"array":return`[ type: ${e} , hash: ${t.hash}]`;case"object":return`[ type: ${e}, key: ${t.key} , hash: ${t.hash}]`;default:return`[ type: ${e} , value: ${t.value}]`}}function p(e,t,n,a,c,l,u,d){n=n||[],u=u||[];const g=(c=c||[]).slice(0);if(null!=l){if(a){if("function"==typeof a&&a(g,l))return;if("object"==typeof a){if(a.prefilter&&a.prefilter(g,l))return;if(a.normalize){var x=a.normalize(g,l,e,t);x&&(e=x[0],t=x[1])}}}g.push(l)}"regexp"===h(e)&&"regexp"===h(t)&&(e=e.toString(),t=t.toString());const b=typeof e,y=typeof t;let D,k,v,w;const m="undefined"!==b||u&&u.length>0&&u[u.length-1].lhs&&Object.getOwnPropertyDescriptor(u[u.length-1].lhs,l),A="undefined"!==y||u&&u.length>0&&u[u.length-1].rhs&&Object.getOwnPropertyDescriptor(u[u.length-1].rhs,l);if(!m&&A)n.push(new s(g,t));else if(!A&&m)n.push(new i(g,e));else if(h(e)!==h(t))n.push(new r(g,e,t));else if("date"===h(e)&&e-t!=0)n.push(new r(g,e,t));else if("object"===b&&null!==e&&null!==t){for(D=u.length-1;D>-1;--D)if(u[D].lhs===e){w=!0;break}if(w)e!==t&&n.push(new r(g,e,t));else{if(u.push({lhs:e,rhs:t}),Array.isArray(e)){for(d&&(e.sort((function(e,t){return f(e)-f(t)})),t.sort((function(e,t){return f(e)-f(t)}))),D=t.length-1,k=e.length-1;D>k;)n.push(new o(g,D,new s(void 0,t[D--])));for(;k>D;)n.push(new o(g,k,new i(void 0,e[k--])));for(;D>=0;--D)p(e[D],t[D],n,a,g,D,u,d)}else{var E=Object.keys(e).concat(Object.getOwnPropertySymbols(e)),N=Object.keys(t).concat(Object.getOwnPropertySymbols(t));for(D=0;D<E.length;++D)v=E[D],w=N.indexOf(v),w>=0?(p(e[v],t[v],n,a,g,v,u,d),N[w]=null):p(e[v],void 0,n,a,g,v,u,d);for(D=0;D<N.length;++D)v=N[D],v&&p(void 0,t[v],n,a,g,v,u,d)}u.length=u.length-1}}else e!==t&&("number"===b&&isNaN(e)&&isNaN(t)||n.push(new r(g,e,t)))}function u(e,t,n,r,s){const i=[];if(p(e,t,i,r,null,null,null,s),n)for(let e=0;e<i.length;++e)n(i[e]);return i}function d(e,t,n,r){const s=u(e,t,r?function(e){e&&r.push(e)}:void 0,n);return r||(s.length?s:void 0)}function g(e,t,n){var r;if(null!=(r=n.path)&&r.length){let[r,s]=function(e,t){const n=(t=t.slice()).pop();let r=e;return t.reduce(((e,t)=>r=e[t]),r),[r,n]}(e[t],n.path);switch(n.kind){case"A":g(r[s],n.index,n.item);break;case"D":delete r[s];break;case"E":case"N":r[s]=n.rhs}}else switch(n.kind){case"A":g(e[t],n.index,n.item);break;case"D":e=a(e,t);break;case"E":case"N":e[t]=n.rhs}return e}function x(e){return null!=e&&e&&t.includes(e.kind)}function b(e,t,n){if(void 0===n&&x(t)&&(n=t),e&&n&&n.kind){let t=e,r=-1,s=n.path?n.path.length-1:0;for(;++r<s;)void 0===t[n.path[r]]&&(t[n.path[r]]=void 0!==n.path[r+1]&&"number"==typeof n.path[r+1]?[]:{}),t=t[n.path[r]];switch(n.kind){case"A":n.path&&void 0===t[n.path[r]]&&(t[n.path[r]]=[]),g(n.path?t[n.path[r]]:t,n.index,n.item);break;case"D":delete t[n.path[r]];break;case"E":case"N":t[n.path[r]]=n.rhs}}}function y(e,t,n){if(n.path&&n.path.length){let r,s=e[t],i=n.path.length-1;for(r=0;r<i;r++)s=s[n.path[r]];switch(n.kind){case"A":y(s[n.path[r]],n.index,n.item);break;case"D":case"E":s[n.path[r]]=n.lhs;break;case"N":delete s[n.path[r]]}}else switch(n.kind){case"A":y(e[t],n.index,n.item);break;case"D":case"E":e[t]=n.lhs;break;case"N":e=a(e,t)}return e}function D(e,t,n){if(e&&t&&null!=n&&n.kind){let t,r,s=e;for(r=n.path.length-1,t=0;t<r;t++)void 0===s[n.path[t]]&&(s[n.path[t]]={}),s=s[n.path[t]];switch(n.kind){case"A":y(s[n.path[t]],n.index,n.item);break;case"D":case"E":s[n.path[t]]=n.lhs;break;case"N":delete s[n.path[t]]}}}function k(e,t,n){return t.forEach((t=>{n(e,!0,t)})),!0}exports.Diff=n,exports.DiffArray=o,exports.DiffDeleted=i,exports.DiffEdit=r,exports.DiffNew=s,exports.applyChange=b,exports.applyDiff=function(e,t,n){return e&&t&&u(e,t,(function(r){n&&!n(e,t,r)||b(e,t,r)})),e},exports.applyDiffChange=function(e,t){if(k(e,t,b))return e},exports.deepDiff=d,exports.default=d,exports.diff=d,exports.getOrderIndependentHash=f,exports.isIDiffNode=x,exports.observableDiff=u,exports.orderIndependentDiff=function(e,t,n,r){const s=u(e,t,r?function(e){e&&r.push(e)}:void 0,n,!0);return r||(s.length?s:void 0)},exports.orderIndependentObservableDiff=function(e,t,n,r,s,i,o){return p(e,t,n,r,s,i,o,!0)},exports.revertChange=D,exports.revertDiffChange=function(e,t){if(k(e,t,D))return e};
+var e;Object.defineProperty(exports, "__esModule", ({value:!0})),exports.EnumKinds=void 0,(e=exports.EnumKinds||(exports.EnumKinds={})).DiffEdit="E",e.DiffNew="N",e.DiffDeleted="D",e.DiffArray="A";const t=["N","E","A","D"];class n{constructor(e,t){this.kind=e,null!=t&&t.length&&(this.path=t)}}class r extends n{constructor(e,t,n){super("E",e),this.lhs=t,this.rhs=n}}class s extends n{constructor(e,t){super("N",e),this.rhs=t}}class i extends n{constructor(e,t){super("D",e),this.lhs=t}}class o extends n{constructor(e,t,n){super("A",e),this.index=t,this.item=n}}function a(e,t){return e.splice(t,1)}function h(e){const t=typeof e;return"object"!==t?t:e===Math?"math":null===e?"null":Array.isArray(e)?"array":"[object Date]"===Object.prototype.toString.call(e)?"date":"function"==typeof e.toString&&/^\/.*\//.test(e.toString())?"regexp":"object"}function c(e){let t=0;if(0===e.length)return t;for(let n=0;n<e.length;n++)t=(t<<5)-t+e.charCodeAt(n),t&=t;return t}function f(e){let t=0;const n=h(e);if("array"===n){e.forEach((function(e){t+=f(e)}));const r=l(n,{hash:t});return t+c(r)}if("object"===n){for(const r in e)if(e.hasOwnProperty(r)){const s=l(n,{key:r,hash:f(e[r])});t+=c(s)}return t}const r=l(n,{value:e});return t+c(r)}function l(e,t){switch(e){case"array":return`[ type: ${e} , hash: ${t.hash}]`;case"object":return`[ type: ${e}, key: ${t.key} , hash: ${t.hash}]`;default:return`[ type: ${e} , value: ${t.value}]`}}function p(e,t,n,a,c,l,u,d){n=n||[],u=u||[];const g=(c=c||[]).slice(0);if(null!=l){if(a){if("function"==typeof a&&a(g,l))return;if("object"==typeof a){if(a.prefilter&&a.prefilter(g,l))return;if(a.normalize){var x=a.normalize(g,l,e,t);x&&(e=x[0],t=x[1])}}}g.push(l)}"regexp"===h(e)&&"regexp"===h(t)&&(e=e.toString(),t=t.toString());const b=typeof e,y=typeof t;let D,k,v,w;const m="undefined"!==b||u&&u.length>0&&u[u.length-1].lhs&&Object.getOwnPropertyDescriptor(u[u.length-1].lhs,l),A="undefined"!==y||u&&u.length>0&&u[u.length-1].rhs&&Object.getOwnPropertyDescriptor(u[u.length-1].rhs,l);if(!m&&A)n.push(new s(g,t));else if(!A&&m)n.push(new i(g,e));else if(h(e)!==h(t))n.push(new r(g,e,t));else if("date"===h(e)&&e-t!=0)n.push(new r(g,e,t));else if("object"===b&&null!==e&&null!==t){for(D=u.length-1;D>-1;--D)if(u[D].lhs===e){w=!0;break}if(w)e!==t&&n.push(new r(g,e,t));else{if(u.push({lhs:e,rhs:t}),Array.isArray(e)){for(d&&(e.sort((function(e,t){return f(e)-f(t)})),t.sort((function(e,t){return f(e)-f(t)}))),D=t.length-1,k=e.length-1;D>k;)n.push(new o(g,D,new s(void 0,t[D--])));for(;k>D;)n.push(new o(g,k,new i(void 0,e[k--])));for(;D>=0;--D)p(e[D],t[D],n,a,g,D,u,d)}else{var E=Object.keys(e).concat(Object.getOwnPropertySymbols(e)),N=Object.keys(t).concat(Object.getOwnPropertySymbols(t));for(D=0;D<E.length;++D)v=E[D],w=N.indexOf(v),w>=0?(p(e[v],t[v],n,a,g,v,u,d),N[w]=null):p(e[v],void 0,n,a,g,v,u,d);for(D=0;D<N.length;++D)v=N[D],v&&p(void 0,t[v],n,a,g,v,u,d)}u.length=u.length-1}}else e!==t&&("number"===b&&isNaN(e)&&isNaN(t)||n.push(new r(g,e,t)))}function u(e,t,n,r,s){const i=[];if(p(e,t,i,r,null,null,null,s),n)for(let e=0;e<i.length;++e)n(i[e]);return i}function d(e,t,n,r){const s=u(e,t,r?function(e){e&&r.push(e)}:void 0,n);return r||(s.length?s:void 0)}function g(e,t,n){var r;if(null!=(r=n.path)&&r.length){let[r,s]=function(e,t){const n=(t=t.slice()).pop();let r=e;return t.reduce(((e,t)=>r=e[t]),r),[r,n]}(e[t],n.path);switch(n.kind){case"A":g(r[s],n.index,n.item);break;case"D":delete r[s];break;case"E":case"N":r[s]=n.rhs}}else switch(n.kind){case"A":g(e[t],n.index,n.item);break;case"D":e=a(e,t);break;case"E":case"N":e[t]=n.rhs}return e}function x(e){return null!=e&&e&&t.includes(e.kind)}function b(e,t,n){if(void 0===n&&x(t)&&(n=t),e&&n&&n.kind){let t=e,r=-1,s=n.path?n.path.length-1:0;for(;++r<s;)void 0===t[n.path[r]]&&(t[n.path[r]]=void 0!==n.path[r+1]&&"number"==typeof n.path[r+1]?[]:{}),t=t[n.path[r]];switch(n.kind){case"A":n.path&&void 0===t[n.path[r]]&&(t[n.path[r]]=[]),g(n.path?t[n.path[r]]:t,n.index,n.item);break;case"D":delete t[n.path[r]];break;case"E":case"N":t[n.path[r]]=n.rhs}}}function y(e,t,n){if(n.path&&n.path.length){let r,s=e[t],i=n.path.length-1;for(r=0;r<i;r++)s=s[n.path[r]];switch(n.kind){case"A":y(s[n.path[r]],n.index,n.item);break;case"D":case"E":s[n.path[r]]=n.lhs;break;case"N":delete s[n.path[r]]}}else switch(n.kind){case"A":y(e[t],n.index,n.item);break;case"D":case"E":e[t]=n.lhs;break;case"N":e=a(e,t)}return e}function D(e,t,n){if(e&&t&&null!=n&&n.kind){let t,r,s=e;for(r=n.path.length-1,t=0;t<r;t++)void 0===s[n.path[t]]&&(s[n.path[t]]={}),s=s[n.path[t]];switch(n.kind){case"A":y(s[n.path[t]],n.index,n.item);break;case"D":case"E":s[n.path[t]]=n.lhs;break;case"N":delete s[n.path[t]]}}}function k(e,t,n){return t.forEach((t=>{n(e,!0,t)})),!0}exports.Diff=n,exports.DiffArray=o,exports.DiffDeleted=i,exports.DiffEdit=r,exports.DiffNew=s,exports.applyChange=b,exports.applyDiff=function(e,t,n){return e&&t&&u(e,t,(function(r){n&&!n(e,t,r)||b(e,t,r)})),e},exports.applyDiffChange=function(e,t){if(k(e,t,b))return e},exports.deepDiff=d,exports["default"]=d,exports.diff=d,exports.getOrderIndependentHash=f,exports.isIDiffNode=x,exports.observableDiff=u,exports.orderIndependentDiff=function(e,t,n,r){const s=u(e,t,r?function(e){e&&r.push(e)}:void 0,n,!0);return r||(s.length?s:void 0)},exports.orderIndependentObservableDiff=function(e,t,n,r,s,i,o){return p(e,t,n,r,s,i,o,!0)},exports.revertChange=D,exports.revertDiffChange=function(e,t){if(k(e,t,D))return e};
 //# sourceMappingURL=index.cjs.production.min.js.map
 
 
@@ -1244,8 +2042,8 @@ const tslib_1 = __nccwpck_require__(4351);
  * Created by user on 2020/6/11.
  */
 const _core_1 = __nccwpck_require__(2701);
-const compare_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(4309));
-const cmp_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(5098));
+const compare_1 = tslib_1.__importDefault(__nccwpck_require__(4309));
+const cmp_1 = tslib_1.__importDefault(__nccwpck_require__(5098));
 function compare(part1, part2, optionsOrLoose) {
     return (0, compare_1.default)(...(0, _core_1._part)(part1, part2), optionsOrLoose);
 }
@@ -1333,16 +2131,15 @@ exports.parseVersionsAndCompare = parseVersionsAndCompare;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.detectYarnLockVersion = void 0;
-const tslib_1 = __nccwpck_require__(4351);
 const types_1 = __nccwpck_require__(891);
 const parsers_1 = __nccwpck_require__(2737);
-const detectYarnLockVersionByObject_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(541));
+const detectYarnLockVersionByObject_1 = __nccwpck_require__(541);
 function detectYarnLockVersion(buf) {
     let head = buf.slice(0, 160).toString().trim();
     if (head.includes('# yarn lockfile v1')) {
         return types_1.EnumDetectYarnLock.v1;
     }
-    else if (/^__metadata:\s*version: 4(?:\r|\n)/m.test(head)) {
+    else if (/^__metadata:\s*version: (4|5)(?:\r|\n)/m.test(head)) {
         return types_1.EnumDetectYarnLock.berry;
     }
     else if (tryParse(buf)) {
@@ -1354,12 +2151,12 @@ exports.detectYarnLockVersion = detectYarnLockVersion;
 function tryParse(buf) {
     try {
         let json = (0, parsers_1.parseSyml)(buf.toString());
-        return (0, detectYarnLockVersionByObject_1.default)(json) === types_1.EnumDetectYarnLock.berry;
+        return (0, detectYarnLockVersionByObject_1.detectYarnLockVersionByObject)(json) === types_1.EnumDetectYarnLock.berry;
     }
     catch (e) {
     }
 }
-exports.default = detectYarnLockVersion;
+exports["default"] = detectYarnLockVersion;
 //# sourceMappingURL=detectYarnLockVersion.js.map
 
 /***/ }),
@@ -1411,7 +2208,7 @@ function checkV1(obj) {
     }
 }
 exports.checkV1 = checkV1;
-exports.default = detectYarnLockVersionByObject;
+exports["default"] = detectYarnLockVersionByObject;
 //# sourceMappingURL=detectYarnLockVersionByObject.js.map
 
 /***/ }),
@@ -1426,6 +2223,10 @@ exports.EnumDetectYarnLock = void 0;
 var EnumDetectYarnLock;
 (function (EnumDetectYarnLock) {
     EnumDetectYarnLock[EnumDetectYarnLock["v1"] = 1] = "v1";
+    /**
+     * @deprecated do not use this if u want check is version is berry
+     * @type {EnumDetectYarnLock.v2}
+     */
     EnumDetectYarnLock[EnumDetectYarnLock["v2"] = 2] = "v2";
     EnumDetectYarnLock[EnumDetectYarnLock["berry"] = 2] = "berry";
     EnumDetectYarnLock[EnumDetectYarnLock["unknown"] = 0] = "unknown";
@@ -1445,7 +2246,7 @@ const tslib_1 = __nccwpck_require__(4351);
 const upath2_1 = __nccwpck_require__(1306);
 Object.defineProperty(exports, "pathNormalize", ({ enumerable: true, get: function () { return upath2_1.normalize; } }));
 const core_1 = __nccwpck_require__(1158);
-const err_code_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(2997));
+const err_code_1 = tslib_1.__importDefault(__nccwpck_require__(2997));
 const pkg_dir_1 = __nccwpck_require__(8098);
 function findRootLazy(options, _throwError) {
     var _a;
@@ -1459,19 +2260,20 @@ function findRoot(options, _throwError) {
     if (!((_a = options.cwd) === null || _a === void 0 ? void 0 : _a.length)) {
         throw new RangeError(`options.cwd is '${options.cwd}'`);
     }
+    const cwd = (0, upath2_1.normalize)(options.cwd);
     let ws;
     if (!options.skipCheckWorkspace) {
-        ws = (0, core_1.findWorkspaceRoot)(options.cwd);
+        ws = (0, core_1.findWorkspaceRoot)(cwd);
     }
     else if (options.shouldHasWorkspaces) {
         throw (0, err_code_1.default)(new RangeError(`shouldHasWorkspaces and skipCheckWorkspace should not enable at same time`), {
             options,
         });
     }
-    let pkg = (0, pkg_dir_1.sync)(options.cwd);
+    let pkg = (0, pkg_dir_1.sync)(cwd);
     const { throwError = _throwError } = options;
     if (pkg == null && (throwError || options.shouldHasWorkspaces)) {
-        const err = (0, err_code_1.default)(new RangeError(`can't found package root from target directory '${options.cwd}'`), {
+        const err = (0, err_code_1.default)(new RangeError(`can't found package root from target directory '${cwd}'`), {
             options,
         });
         throw err;
@@ -1492,6 +2294,7 @@ function findRoot(options, _throwError) {
         return null;
     }
     const rootData = {
+        cwd,
         pkg,
         ws,
         hasWorkspace,
@@ -1572,7 +2375,7 @@ function listMatchedPatternByPath(ws, pkg) {
     }, []);
 }
 exports.listMatchedPatternByPath = listMatchedPatternByPath;
-exports.default = findRoot;
+exports["default"] = findRoot;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -1585,11 +2388,14 @@ exports.default = findRoot;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.npaTry = exports.npa = exports.getSemverFromNpaResult = void 0;
 const tslib_1 = __nccwpck_require__(4351);
-const npm_package_arg_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(2695));
+const npm_package_arg_1 = tslib_1.__importDefault(__nccwpck_require__(680));
+const assert_1 = __nccwpck_require__(6081);
 var getSemverFromNpaResult_1 = __nccwpck_require__(9978);
 Object.defineProperty(exports, "getSemverFromNpaResult", ({ enumerable: true, get: function () { return getSemverFromNpaResult_1.getSemverFromNpaResult; } }));
 function npa(arg, where) {
-    return (0, npm_package_arg_1.default)(arg, where);
+    const result = (0, npm_package_arg_1.default)(arg, where);
+    (0, assert_1.assertNpaResultHasName)(result);
+    return result;
 }
 exports.npa = npa;
 function npaTry(arg, where) {
@@ -1600,8 +2406,26 @@ function npaTry(arg, where) {
     }
 }
 exports.npaTry = npaTry;
-exports.default = npa;
+exports["default"] = npa;
 //# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 6081:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.assertNpaResultHasName = void 0;
+function assertNpaResultHasName(result) {
+    var _a;
+    if (!((_a = result.name) === null || _a === void 0 ? void 0 : _a.length)) {
+        throw new Error(`Invalid input: ${result.raw}`);
+    }
+}
+exports.assertNpaResultHasName = assertNpaResultHasName;
+//# sourceMappingURL=assert.js.map
 
 /***/ }),
 
@@ -1625,7 +2449,7 @@ function getSemverFromNpaResult(npaResult) {
     return semver;
 }
 exports.getSemverFromNpaResult = getSemverFromNpaResult;
-exports.default = getSemverFromNpaResult;
+exports["default"] = getSemverFromNpaResult;
 //# sourceMappingURL=getSemverFromNpaResult.js.map
 
 /***/ }),
@@ -1641,10 +2465,10 @@ const tslib_1 = __nccwpck_require__(4351);
  * Created by user on 2020/6/11.
  */
 const colorize_1 = __nccwpck_require__(2909);
-(0, tslib_1.__exportStar)(__nccwpck_require__(1928), exports);
-(0, tslib_1.__exportStar)(__nccwpck_require__(2909), exports);
-(0, tslib_1.__exportStar)(__nccwpck_require__(3881), exports);
-exports.default = colorize_1.colorizeDiff;
+tslib_1.__exportStar(__nccwpck_require__(1928), exports);
+tslib_1.__exportStar(__nccwpck_require__(2909), exports);
+tslib_1.__exportStar(__nccwpck_require__(3881), exports);
+exports["default"] = colorize_1.colorizeDiff;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -1757,7 +2581,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createDependencyTable = void 0;
 const tslib_1 = __nccwpck_require__(4351);
-const cli_table3_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(2101));
+const cli_table3_1 = tslib_1.__importDefault(__nccwpck_require__(2101));
 function createDependencyTable(options) {
     return new cli_table3_1.default({
         colAligns: ['left', 'right', 'right', 'right'],
@@ -1794,7 +2618,7 @@ exports.createDependencyTable = createDependencyTable;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.hasBanner = exports.EnumYaenLockBanner = void 0;
-const index_1 = __nccwpck_require__(901);
+const crlf_normalize_1 = __nccwpck_require__(6347);
 var EnumYaenLockBanner;
 (function (EnumYaenLockBanner) {
     EnumYaenLockBanner["v1"] = "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1";
@@ -1802,7 +2626,7 @@ var EnumYaenLockBanner;
 })(EnumYaenLockBanner = exports.EnumYaenLockBanner || (exports.EnumYaenLockBanner = {}));
 function hasBanner(yarnlock_old) {
     yarnlock_old = yarnlock_old.toString();
-    let lines = yarnlock_old.split(index_1.R_CRLF);
+    let lines = yarnlock_old.split(crlf_normalize_1.R_CRLF);
     let banners = [];
     let i = 0;
     for (i = 0; i < lines.length; i++) {
@@ -1814,18 +2638,18 @@ function hasBanner(yarnlock_old) {
             break;
         }
     }
-    let banner = banners.join(index_1.LF).replace(/^\n+|\n+$/g, '');
+    let banner = banners.join(crlf_normalize_1.LF).replace(/^\n+|\n+$/g, '');
     if (banner.length > 0) {
         banner += '\n\n';
     }
-    let content = lines.slice(i).join(index_1.LF);
+    let content = lines.slice(i).join(crlf_normalize_1.LF);
     return {
         banner,
         content,
     };
 }
 exports.hasBanner = hasBanner;
-exports.default = hasBanner;
+exports["default"] = hasBanner;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -1836,12 +2660,13 @@ exports.default = hasBanner;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.yarnDedupe = exports.fixDuplicates = exports.listDuplicates = void 0;
+exports.yarnDedupe = exports.yarnDedupeFile = exports.fixDuplicates = exports.listDuplicates = void 0;
 const tslib_1 = __nccwpck_require__(4351);
-const detectYarnLockVersion_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(4018));
+const detectYarnLockVersion_1 = tslib_1.__importDefault(__nccwpck_require__(4018));
 const types_1 = __nccwpck_require__(891);
-const v2_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(9202));
-const v1_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(750));
+const v2_1 = tslib_1.__importDefault(__nccwpck_require__(9202));
+const v1_1 = tslib_1.__importDefault(__nccwpck_require__(750));
+const fs_1 = __nccwpck_require__(7147);
 function listDuplicates(yarnlock_old, options) {
     yarnlock_old = yarnlock_old.toString();
     let verType = (0, detectYarnLockVersion_1.default)(yarnlock_old);
@@ -1866,6 +2691,10 @@ function fixDuplicates(yarnlock_old, options) {
     throw new TypeError(`can't detect yarn.lock version`);
 }
 exports.fixDuplicates = fixDuplicates;
+function yarnDedupeFile(yarnlock_old_file, options) {
+    return yarnDedupe((0, fs_1.readFileSync)(yarnlock_old_file), options);
+}
+exports.yarnDedupeFile = yarnDedupeFile;
 function yarnDedupe(yarnlock_old, options) {
     yarnlock_old = yarnlock_old.toString();
     const yarnlock_new = fixDuplicates(yarnlock_old, options);
@@ -1890,7 +2719,7 @@ const auto = {
     fixDuplicates,
     yarnDedupe,
 };
-exports.default = auto;
+exports["default"] = auto;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -1949,7 +2778,7 @@ const v1 = {
     listDuplicates: listDuplicates_1.listDuplicates,
     yarnDedupe,
 };
-exports.default = v1;
+exports["default"] = v1;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -1979,7 +2808,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.fixDuplicates = void 0;
 const tslib_1 = __nccwpck_require__(4351);
 const yarn_berry_deduplicate_1 = __nccwpck_require__(769);
-const yarnlock_banner_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(8785));
+const yarnlock_banner_1 = tslib_1.__importDefault(__nccwpck_require__(8785));
 function fixDuplicates(yarnlock_old, options) {
     yarnlock_old = yarnlock_old.toString();
     let { banner, content } = (0, yarnlock_banner_1.default)(yarnlock_old);
@@ -2026,7 +2855,7 @@ const v2 = {
     listDuplicates: listDuplicates_1.listDuplicates,
     yarnDedupe,
 };
-exports.default = v2;
+exports["default"] = v2;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -2063,7 +2892,7 @@ function yarnLockDiff(yarnlock_old, yarnlock_new, options) {
     return (0, formatter_1.buildDiffTable)(diff, options);
 }
 exports.yarnLockDiff = yarnLockDiff;
-exports.default = yarnLockDiff;
+exports["default"] = yarnLockDiff;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -2095,14 +2924,14 @@ exports.buildDiff = buildDiff;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.buildComputedPackage = void 0;
-const index_1 = __nccwpck_require__(290);
+const yarnlock_parse_1 = __nccwpck_require__(290);
 const computeHashmapOfPackageAndVersionList_1 = __nccwpck_require__(7673);
 function buildComputedPackage(yarnLockContentList, alreadyComputedPackage = {}) {
     if (!Array.isArray(yarnLockContentList)) {
         yarnLockContentList = [yarnLockContentList];
     }
     return yarnLockContentList
-        .map(v => (0, index_1.yarnLockParse)(v))
+        .map(v => (0, yarnlock_parse_1.yarnLockParse)(v))
         .reduce(computeHashmapOfPackageAndVersionList_1.computeHashmapOfPackageAndVersionList, alreadyComputedPackage);
 }
 exports.buildComputedPackage = buildComputedPackage;
@@ -2120,7 +2949,7 @@ exports.computeHashmapOfPackageAndVersionList = void 0;
 const yarnlock_parse_1 = __nccwpck_require__(290);
 const parseYarnLockRowV1_1 = __nccwpck_require__(1222);
 const parseYarnLockRowV2_1 = __nccwpck_require__(8897);
-const array_hyper_unique_1 = __nccwpck_require__(9823);
+const array_hyper_unique_1 = __nccwpck_require__(3603);
 const semver_1 = __nccwpck_require__(1383);
 const types_1 = __nccwpck_require__(891);
 const reduceYarnLockParsedEntries_1 = __nccwpck_require__(1167);
@@ -2193,14 +3022,14 @@ exports.buildDiffTable = void 0;
 const tslib_1 = __nccwpck_require__(4351);
 const formatVersion_1 = __nccwpck_require__(3632);
 const diffArray002_1 = __nccwpck_require__(5865);
-const index_1 = __nccwpck_require__(912);
+const semver_diff_1 = __nccwpck_require__(912);
 const core_1 = __nccwpck_require__(6265);
-const index_2 = __nccwpck_require__(6465);
-const strip_ansi_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(5591));
+const debug_color2_1 = __nccwpck_require__(6465);
+const strip_ansi_1 = tslib_1.__importDefault(__nccwpck_require__(5591));
 function buildDiffTable(diff, options) {
     var _a;
     // @ts-ignore
-    let chalk = (_a = options === null || options === void 0 ? void 0 : options.chalk) !== null && _a !== void 0 ? _a : (0, index_2.chalkByConsoleMaybe)(options === null || options === void 0 ? void 0 : options.console);
+    let chalk = (_a = options === null || options === void 0 ? void 0 : options.chalk) !== null && _a !== void 0 ? _a : (0, debug_color2_1.chalkByConsoleMaybe)(options === null || options === void 0 ? void 0 : options.console);
     let _ok = false;
     options = {
         ...options,
@@ -2236,7 +3065,7 @@ function buildDiffTable(diff, options) {
                 let lhs0 = (0, formatVersion_1._formatVersion)(packageDiff.lhs);
                 let rhs0 = (0, formatVersion_1._formatVersion)(packageDiff.rhs);
                 let lhs = chalk.yellow(lhs0);
-                let rhs = chalk.yellow((0, index_1.colorizeDiff)(lhs0, rhs0, options));
+                let rhs = chalk.yellow((0, semver_diff_1.colorizeDiff)(lhs0, rhs0, options));
                 _arr = [chalk.yellow(path), lhs, ARROW, rhs];
                 break;
             case "N" /* DiffNew */:
@@ -2321,7 +3150,7 @@ function newYarnLockParsedVersionError(msg) {
     return new TypeError(msg !== null && msg !== void 0 ? msg : 'can\'t detect yarn.lock version');
 }
 exports.newYarnLockParsedVersionError = newYarnLockParsedVersionError;
-exports.default = newYarnLockParsedVersionError;
+exports["default"] = newYarnLockParsedVersionError;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -2333,12 +3162,11 @@ exports.default = newYarnLockParsedVersionError;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.assertYarnLockParsedIsSupported = exports.isYarnLockParsedV2 = exports.isYarnLockParsedV1 = exports.yarnLockParse = void 0;
-const tslib_1 = __nccwpck_require__(4351);
 const lockfile_1 = __nccwpck_require__(904);
 const detectYarnLockVersion_1 = __nccwpck_require__(4018);
 const types_1 = __nccwpck_require__(891);
 const parsers_1 = __nccwpck_require__(2737);
-const yarnlock_error_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(6917));
+const yarnlock_error_1 = __nccwpck_require__(6917);
 function yarnLockParse(yarnlock_old) {
     let verType = (0, detectYarnLockVersion_1.detectYarnLockVersion)(yarnlock_old);
     let data;
@@ -2351,7 +3179,7 @@ function yarnLockParse(yarnlock_old) {
             ({ object: data, ...meta } = (0, lockfile_1.parse)(yarnlock_old.toString()));
             break;
         default:
-            throw (0, yarnlock_error_1.default)();
+            throw (0, yarnlock_error_1.newYarnLockParsedVersionError)();
     }
     return {
         verType,
@@ -2375,10 +3203,10 @@ function assertYarnLockParsedIsSupported(parsedOldPackage, cb) {
     else if (isYarnLockParsedV2(parsedOldPackage)) {
         return cb === null || cb === void 0 ? void 0 : cb(types_1.EnumDetectYarnLock.v2, parsedOldPackage);
     }
-    throw (0, yarnlock_error_1.default)();
+    throw (0, yarnlock_error_1.newYarnLockParsedVersionError)();
 }
 exports.assertYarnLockParsedIsSupported = assertYarnLockParsedIsSupported;
-exports.default = yarnLockParse;
+exports["default"] = yarnLockParse;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -2577,7 +3405,7 @@ module.exports =
 /* 0 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(5622);
+module.exports = __nccwpck_require__(1017);
 
 /***/ }),
 /* 1 */
@@ -2627,13 +3455,13 @@ exports.default = function (fn) {
 /* 2 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(1669);
+module.exports = __nccwpck_require__(3837);
 
 /***/ }),
 /* 3 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(5747);
+module.exports = __nccwpck_require__(7147);
 
 /***/ }),
 /* 4 */
@@ -4060,7 +4888,7 @@ module.exports = invariant;
 /* 9 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(6417);
+module.exports = __nccwpck_require__(6113);
 
 /***/ }),
 /* 10 */,
@@ -4486,7 +5314,7 @@ exports.default = Lockfile;
 /* 17 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(2413);
+module.exports = __nccwpck_require__(2781);
 
 /***/ }),
 /* 18 */,
@@ -4538,7 +5366,7 @@ function nullify(obj = {}) {
 /* 22 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(2357);
+module.exports = __nccwpck_require__(9491);
 
 /***/ }),
 /* 23 */
@@ -4725,7 +5553,7 @@ module.exports = {};
 /* 36 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(2087);
+module.exports = __nccwpck_require__(2037);
 
 /***/ }),
 /* 37 */,
@@ -5010,7 +5838,7 @@ exports.f = __nested_webpack_require_72962__(33) ? Object.defineProperty : funct
 /* 54 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(8614);
+module.exports = __nccwpck_require__(2361);
 
 /***/ }),
 /* 55 */
@@ -6384,7 +7212,7 @@ function onceStrict (fn) {
 /* 63 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(4293);
+module.exports = __nccwpck_require__(4300);
 
 /***/ }),
 /* 64 */,
@@ -7322,7 +8150,7 @@ module.exports.win32 = win32;
 /* 79 */
 /***/ (function(module, exports) {
 
-module.exports = __nccwpck_require__(3867);
+module.exports = __nccwpck_require__(6224);
 
 /***/ }),
 /* 80 */,
@@ -12814,35 +13642,35 @@ peg$subclass(peg$SyntaxError, Error);
 
 peg$SyntaxError.buildMessage = function(expected, found) {
   var DESCRIBE_EXPECTATION_FNS = {
-    literal: function(expectation) {
-      return `"${literalEscape(expectation.text)}"`;
-    },
+        literal: function(expectation) {
+          return "\"" + literalEscape(expectation.text) + "\"";
+        },
 
-    "class": function(expectation) {
-      var escapedParts = "",
-        i;
+        "class": function(expectation) {
+          var escapedParts = "",
+              i;
 
-      for (i = 0; i < expectation.parts.length; i++)
-        escapedParts += expectation.parts[i] instanceof Array
-          ? `${classEscape(expectation.parts[i][0])}-${classEscape(expectation.parts[i][1])}`
-          : classEscape(expectation.parts[i]);
+          for (i = 0; i < expectation.parts.length; i++) {
+            escapedParts += expectation.parts[i] instanceof Array
+              ? classEscape(expectation.parts[i][0]) + "-" + classEscape(expectation.parts[i][1])
+              : classEscape(expectation.parts[i]);
+          }
 
+          return "[" + (expectation.inverted ? "^" : "") + escapedParts + "]";
+        },
 
-      return `[${expectation.inverted ? "^" : ""}${escapedParts}]`;
-    },
+        any: function(expectation) {
+          return "any character";
+        },
 
-    any: function(expectation) {
-      return "any character";
-    },
+        end: function(expectation) {
+          return "end of input";
+        },
 
-    end: function(expectation) {
-      return "end of input";
-    },
-
-    other: function(expectation) {
-      return expectation.description;
-    },
-  };
+        other: function(expectation) {
+          return expectation.description;
+        }
+      };
 
   function hex(ch) {
     return ch.charCodeAt(0).toString(16).toUpperCase();
@@ -12856,8 +13684,8 @@ peg$SyntaxError.buildMessage = function(expected, found) {
       .replace(/\t/g, '\\t')
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
-      .replace(/[\x00-\x0F]/g,          function(ch) { return `\\x0${hex(ch)}`; })
-      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return `\\x${hex(ch)}`; });
+      .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
   }
 
   function classEscape(s) {
@@ -12870,8 +13698,8 @@ peg$SyntaxError.buildMessage = function(expected, found) {
       .replace(/\t/g, '\\t')
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
-      .replace(/[\x00-\x0F]/g,          function(ch) { return `\\x0${hex(ch)}`; })
-      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return `\\x${hex(ch)}`; });
+      .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
   }
 
   function describeExpectation(expectation) {
@@ -12880,11 +13708,11 @@ peg$SyntaxError.buildMessage = function(expected, found) {
 
   function describeExpected(expected) {
     var descriptions = new Array(expected.length),
-      i, j;
+        i, j;
 
-    for (i = 0; i < expected.length; i++)
+    for (i = 0; i < expected.length; i++) {
       descriptions[i] = describeExpectation(expected[i]);
-
+    }
 
     descriptions.sort();
 
@@ -12903,20 +13731,20 @@ peg$SyntaxError.buildMessage = function(expected, found) {
         return descriptions[0];
 
       case 2:
-        return `${descriptions[0]} or ${descriptions[1]}`;
+        return descriptions[0] + " or " + descriptions[1];
 
       default:
-        return `${descriptions.slice(0, -1).join(", ")
-        }, or ${
-          descriptions[descriptions.length - 1]}`;
+        return descriptions.slice(0, -1).join(", ")
+          + ", or "
+          + descriptions[descriptions.length - 1];
     }
   }
 
   function describeFound(found) {
-    return found ? `"${literalEscape(found)}"` : "end of input";
+    return found ? "\"" + literalEscape(found) + "\"" : "end of input";
   }
 
-  return `Expected ${describeExpected(expected)} but ${describeFound(found)} found.`;
+  return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
 };
 
 function peg$parse(input, options) {
@@ -12924,36 +13752,36 @@ function peg$parse(input, options) {
 
   var peg$FAILED = {},
 
-    peg$startRuleFunctions = {resolution: peg$parseresolution},
-    peg$startRuleFunction  = peg$parseresolution,
+      peg$startRuleFunctions = { resolution: peg$parseresolution },
+      peg$startRuleFunction  = peg$parseresolution,
 
-    peg$c0 = "/",
-    peg$c1 = peg$literalExpectation("/", false),
-    peg$c2 = function(from, descriptor) { return {from, descriptor}; },
-    peg$c3 = function(descriptor) { return {descriptor}; },
-    peg$c4 = "@",
-    peg$c5 = peg$literalExpectation("@", false),
-    peg$c6 = function(fullName, description) { return {fullName, description}; },
-    peg$c7 = function(fullName) { return {fullName}; },
-    peg$c8 = function() { return text(); },
-    peg$c9 = /^[^\/@]/,
-    peg$c10 = peg$classExpectation(["/", "@"], true, false),
-    peg$c11 = /^[^\/]/,
-    peg$c12 = peg$classExpectation(["/"], true, false),
+      peg$c0 = "/",
+      peg$c1 = peg$literalExpectation("/", false),
+      peg$c2 = function(from, descriptor) { return { from, descriptor } },
+      peg$c3 = function(descriptor) { return { descriptor } },
+      peg$c4 = "@",
+      peg$c5 = peg$literalExpectation("@", false),
+      peg$c6 = function(fullName, description) { return { fullName, description } },
+      peg$c7 = function(fullName) { return { fullName } },
+      peg$c8 = function() { return text() },
+      peg$c9 = /^[^\/@]/,
+      peg$c10 = peg$classExpectation(["/", "@"], true, false),
+      peg$c11 = /^[^\/]/,
+      peg$c12 = peg$classExpectation(["/"], true, false),
 
-    peg$currPos          = 0,
-    peg$savedPos         = 0,
-    peg$posDetailsCache  = [{line: 1, column: 1}],
-    peg$maxFailPos       = 0,
-    peg$maxFailExpected  = [],
-    peg$silentFails      = 0,
+      peg$currPos          = 0,
+      peg$savedPos         = 0,
+      peg$posDetailsCache  = [{ line: 1, column: 1 }],
+      peg$maxFailPos       = 0,
+      peg$maxFailExpected  = [],
+      peg$silentFails      = 0,
 
-    peg$result;
+      peg$result;
 
   if ("startRule" in options) {
-    if (!(options.startRule in peg$startRuleFunctions))
-      throw new Error(`Can't start parsing from rule "${options.startRule}".`);
-
+    if (!(options.startRule in peg$startRuleFunctions)) {
+      throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
+    }
 
     peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
   }
@@ -12962,14 +13790,12 @@ function peg$parse(input, options) {
     return input.substring(peg$savedPos, peg$currPos);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function location() {
     return peg$computeLocation(peg$savedPos, peg$currPos);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function expected(description, location) {
-    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos);
+    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
 
     throw peg$buildStructuredError(
       [peg$otherExpectation(description)],
@@ -12978,32 +13804,30 @@ function peg$parse(input, options) {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function error(message, location) {
-    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos);
+    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
 
     throw peg$buildSimpleError(message, location);
   }
 
   function peg$literalExpectation(text, ignoreCase) {
-    return {type: "literal", text: text, ignoreCase: ignoreCase};
+    return { type: "literal", text: text, ignoreCase: ignoreCase };
   }
 
   function peg$classExpectation(parts, inverted, ignoreCase) {
-    return {type: "class", parts: parts, inverted: inverted, ignoreCase: ignoreCase};
+    return { type: "class", parts: parts, inverted: inverted, ignoreCase: ignoreCase };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function peg$anyExpectation() {
-    return {type: "any"};
+    return { type: "any" };
   }
 
   function peg$endExpectation() {
-    return {type: "end"};
+    return { type: "end" };
   }
 
   function peg$otherExpectation(description) {
-    return {type: "other", description: description};
+    return { type: "other", description: description };
   }
 
   function peg$computePosDetails(pos) {
@@ -13013,14 +13837,14 @@ function peg$parse(input, options) {
       return details;
     } else {
       p = pos - 1;
-      while (!peg$posDetailsCache[p])
+      while (!peg$posDetailsCache[p]) {
         p--;
-
+      }
 
       details = peg$posDetailsCache[p];
       details = {
         line:   details.line,
-        column: details.column,
+        column: details.column
       };
 
       while (p < pos) {
@@ -13041,24 +13865,24 @@ function peg$parse(input, options) {
 
   function peg$computeLocation(startPos, endPos) {
     var startPosDetails = peg$computePosDetails(startPos),
-      endPosDetails   = peg$computePosDetails(endPos);
+        endPosDetails   = peg$computePosDetails(endPos);
 
     return {
       start: {
         offset: startPos,
         line:   startPosDetails.line,
-        column: startPosDetails.column,
+        column: startPosDetails.column
       },
       end: {
         offset: endPos,
         line:   endPosDetails.line,
-        column: endPosDetails.column,
-      },
+        column: endPosDetails.column
+      }
     };
   }
 
   function peg$fail(expected) {
-    if (peg$currPos < peg$maxFailPos)  return;
+    if (peg$currPos < peg$maxFailPos) { return; }
 
     if (peg$currPos > peg$maxFailPos) {
       peg$maxFailPos = peg$currPos;
@@ -13300,9 +14124,9 @@ function peg$parse(input, options) {
   if (peg$result !== peg$FAILED && peg$currPos === input.length) {
     return peg$result;
   } else {
-    if (peg$result !== peg$FAILED && peg$currPos < input.length)
+    if (peg$result !== peg$FAILED && peg$currPos < input.length) {
       peg$fail(peg$endExpectation());
-
+    }
 
     throw peg$buildStructuredError(
       peg$maxFailExpected,
@@ -13316,7 +14140,7 @@ function peg$parse(input, options) {
 
 module.exports = {
   SyntaxError: peg$SyntaxError,
-  parse:       peg$parse,
+  parse:       peg$parse
 };
 
 
@@ -13470,132 +14294,176 @@ function peg$parse(input, options) {
       peg$startRuleFunction  = peg$parseStart,
 
       peg$c0 = function(line) { return line ? line : [] },
-      peg$c1 = function(command, type, then) { return [ command ].concat(then || []) },
-      peg$c2 = function(command, type) { return [ command ] },
+      peg$c1 = function(command, type, then) { return [ { command, type } ].concat(then || []) },
+      peg$c2 = function(command, type) { return [ { command, type: type || ';' } ] },
       peg$c3 = function(then) { return then },
       peg$c4 = ";",
       peg$c5 = peg$literalExpectation(";", false),
-      peg$c6 = function(chain, then) { return then ? { chain, then } : { chain } },
-      peg$c7 = function(type, then) { return { type, line: then } },
-      peg$c8 = "&&",
-      peg$c9 = peg$literalExpectation("&&", false),
-      peg$c10 = "||",
-      peg$c11 = peg$literalExpectation("||", false),
-      peg$c12 = function(main, then) { return then ? { ...main, then } : main },
-      peg$c13 = function(type, then) { return { type, chain: then } },
-      peg$c14 = "|&",
-      peg$c15 = peg$literalExpectation("|&", false),
-      peg$c16 = "|",
-      peg$c17 = peg$literalExpectation("|", false),
-      peg$c18 = "=",
-      peg$c19 = peg$literalExpectation("=", false),
-      peg$c20 = function(name, arg) { return { name, args: [arg] } },
-      peg$c21 = function(name) { return { name, args: [] } },
-      peg$c22 = "(",
-      peg$c23 = peg$literalExpectation("(", false),
-      peg$c24 = ")",
-      peg$c25 = peg$literalExpectation(")", false),
-      peg$c26 = function(subshell, args) { return { type: `subshell`, subshell, args } },
-      peg$c27 = "{",
-      peg$c28 = peg$literalExpectation("{", false),
-      peg$c29 = "}",
-      peg$c30 = peg$literalExpectation("}", false),
-      peg$c31 = function(group, args) { return { type: `group`, group, args } },
-      peg$c32 = function(envs, args) { return { type: `command`, args, envs } },
-      peg$c33 = function(envs) { return { type: `envs`, envs } },
-      peg$c34 = function(args) { return args },
-      peg$c35 = function(arg) { return arg },
-      peg$c36 = function(redirect, arg) { return { type: `redirection`, subtype: redirect, args: [arg] } },
-      peg$c37 = ">>",
-      peg$c38 = peg$literalExpectation(">>", false),
-      peg$c39 = ">&",
-      peg$c40 = peg$literalExpectation(">&", false),
-      peg$c41 = ">",
-      peg$c42 = peg$literalExpectation(">", false),
-      peg$c43 = "<<<",
-      peg$c44 = peg$literalExpectation("<<<", false),
-      peg$c45 = "<&",
-      peg$c46 = peg$literalExpectation("<&", false),
-      peg$c47 = "<",
-      peg$c48 = peg$literalExpectation("<", false),
-      peg$c49 = function(segments) { return { type: `argument`, segments: [].concat(... segments) } },
-      peg$c50 = function(string) { return string },
-      peg$c51 = "'",
-      peg$c52 = peg$literalExpectation("'", false),
-      peg$c53 = function(text) { return [ { type: `text`, text } ] },
-      peg$c54 = "\"",
-      peg$c55 = peg$literalExpectation("\"", false),
-      peg$c56 = function(segments) { return segments },
-      peg$c57 = function(arithmetic) { return { type: `arithmetic`, arithmetic, quoted: true} },
-      peg$c58 = function(shell) { return { type: `shell`, shell, quoted: true } },
-      peg$c59 = function(variable) { return { type: `variable`, ...variable, quoted: true } },
-      peg$c60 = function(text) { return { type: `text`, text } },
-      peg$c61 = function(arithmetic) { return { type: `arithmetic`, arithmetic, quoted: false} },
-      peg$c62 = function(shell) { return { type: `shell`, shell, quoted: false } },
-      peg$c63 = function(variable) { return { type: `variable`, ...variable, quoted: false } },
-      peg$c64 = function(pattern) { return { type: `glob`, pattern } },
-      peg$c65 = "\\",
-      peg$c66 = peg$literalExpectation("\\", false),
-      peg$c67 = peg$anyExpectation(),
-      peg$c68 = function(c) { return c },
-      peg$c69 = /^[^']/,
-      peg$c70 = peg$classExpectation(["'"], true, false),
-      peg$c71 = function(chars) { return chars.join(``) },
-      peg$c72 = /^[^$"]/,
-      peg$c73 = peg$classExpectation(["$", "\""], true, false),
-      peg$c74 = "-",
-      peg$c75 = peg$literalExpectation("-", false),
-      peg$c76 = "+",
-      peg$c77 = peg$literalExpectation("+", false),
-      peg$c78 = /^[0-9]/,
-      peg$c79 = peg$classExpectation([["0", "9"]], false, false),
-      peg$c80 = ".",
-      peg$c81 = peg$literalExpectation(".", false),
-      peg$c82 = function(sign, left, right) { return { type: `number`, value: (sign === '-' ? -1 : 1) * parseFloat(left.join(``) + `.` + right.join(``)) } },
-      peg$c83 = function(sign, value) { return { type: `number`, value: (sign === '-' ? -1 : 1) *  parseInt(value.join(``)) } },
-      peg$c84 = function(variable) { return { type: `variable`, ...variable } },
-      peg$c85 = function(name) { return { type: `variable`, name } },
-      peg$c86 = function(value) { return value },
-      peg$c87 = "*",
-      peg$c88 = peg$literalExpectation("*", false),
-      peg$c89 = function(left, right) { return { type: `multiplication`, left, right } },
-      peg$c90 = "/",
-      peg$c91 = peg$literalExpectation("/", false),
-      peg$c92 = function(left, right) { return { type: `division`, left, right } },
-      peg$c93 = function(left, right) { return { type: `addition`, left, right } },
-      peg$c94 = function(left, right) { return { type: `subtraction`, left, right } },
-      peg$c95 = "$((",
-      peg$c96 = peg$literalExpectation("$((", false),
-      peg$c97 = "))",
-      peg$c98 = peg$literalExpectation("))", false),
-      peg$c99 = function(arithmetic) { return arithmetic },
-      peg$c100 = "$(",
-      peg$c101 = peg$literalExpectation("$(", false),
-      peg$c102 = function(command) { return command },
-      peg$c103 = "${",
-      peg$c104 = peg$literalExpectation("${", false),
-      peg$c105 = ":-",
-      peg$c106 = peg$literalExpectation(":-", false),
-      peg$c107 = function(name, arg) { return { name, defaultValue: arg } },
-      peg$c108 = ":-}",
-      peg$c109 = peg$literalExpectation(":-}", false),
-      peg$c110 = function(name) { return { name, defaultValue: [] } },
-      peg$c111 = function(name) { return { name } },
-      peg$c112 = "$",
-      peg$c113 = peg$literalExpectation("$", false),
-      peg$c114 = function(pattern) { return options.isGlobPattern(pattern) },
-      peg$c115 = function(pattern) { return pattern },
-      peg$c116 = /^[a-zA-Z0-9_]/,
-      peg$c117 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false),
-      peg$c118 = function() { return text() },
-      peg$c119 = /^[$@*?#a-zA-Z0-9_\-]/,
-      peg$c120 = peg$classExpectation(["$", "@", "*", "?", "#", ["a", "z"], ["A", "Z"], ["0", "9"], "_", "-"], false, false),
-      peg$c121 = /^[(){}<>$|&; \t"']/,
-      peg$c122 = peg$classExpectation(["(", ")", "{", "}", "<", ">", "$", "|", "&", ";", " ", "\t", "\"", "'"], false, false),
-      peg$c123 = /^[<>&; \t"']/,
-      peg$c124 = peg$classExpectation(["<", ">", "&", ";", " ", "\t", "\"", "'"], false, false),
-      peg$c125 = /^[ \t]/,
-      peg$c126 = peg$classExpectation([" ", "\t"], false, false),
+      peg$c6 = "&",
+      peg$c7 = peg$literalExpectation("&", false),
+      peg$c8 = function(chain, then) { return then ? { chain, then } : { chain } },
+      peg$c9 = function(type, then) { return { type, line: then } },
+      peg$c10 = "&&",
+      peg$c11 = peg$literalExpectation("&&", false),
+      peg$c12 = "||",
+      peg$c13 = peg$literalExpectation("||", false),
+      peg$c14 = function(main, then) { return then ? { ...main, then } : main },
+      peg$c15 = function(type, then) { return { type, chain: then } },
+      peg$c16 = "|&",
+      peg$c17 = peg$literalExpectation("|&", false),
+      peg$c18 = "|",
+      peg$c19 = peg$literalExpectation("|", false),
+      peg$c20 = "=",
+      peg$c21 = peg$literalExpectation("=", false),
+      peg$c22 = function(name, arg) { return { name, args: [arg] } },
+      peg$c23 = function(name) { return { name, args: [] } },
+      peg$c24 = "(",
+      peg$c25 = peg$literalExpectation("(", false),
+      peg$c26 = ")",
+      peg$c27 = peg$literalExpectation(")", false),
+      peg$c28 = function(subshell, args) { return { type: `subshell`, subshell, args } },
+      peg$c29 = "{",
+      peg$c30 = peg$literalExpectation("{", false),
+      peg$c31 = "}",
+      peg$c32 = peg$literalExpectation("}", false),
+      peg$c33 = function(group, args) { return { type: `group`, group, args } },
+      peg$c34 = function(envs, args) { return { type: `command`, args, envs } },
+      peg$c35 = function(envs) { return { type: `envs`, envs } },
+      peg$c36 = function(args) { return args },
+      peg$c37 = function(arg) { return arg },
+      peg$c38 = /^[0-9]/,
+      peg$c39 = peg$classExpectation([["0", "9"]], false, false),
+      peg$c40 = function(fd, redirect, arg) { return { type: `redirection`, subtype: redirect, fd: fd !== null ? parseInt(fd) : null, args: [arg] } },
+      peg$c41 = ">>",
+      peg$c42 = peg$literalExpectation(">>", false),
+      peg$c43 = ">&",
+      peg$c44 = peg$literalExpectation(">&", false),
+      peg$c45 = ">",
+      peg$c46 = peg$literalExpectation(">", false),
+      peg$c47 = "<<<",
+      peg$c48 = peg$literalExpectation("<<<", false),
+      peg$c49 = "<&",
+      peg$c50 = peg$literalExpectation("<&", false),
+      peg$c51 = "<",
+      peg$c52 = peg$literalExpectation("<", false),
+      peg$c53 = function(segments) { return { type: `argument`, segments: [].concat(... segments) } },
+      peg$c54 = function(string) { return string },
+      peg$c55 = "'",
+      peg$c56 = peg$literalExpectation("'", false),
+      peg$c57 = function(text) { return [ { type: `text`, text } ] },
+      peg$c58 = "\"",
+      peg$c59 = peg$literalExpectation("\"", false),
+      peg$c60 = function(segments) { return segments },
+      peg$c61 = function(arithmetic) { return { type: `arithmetic`, arithmetic, quoted: true} },
+      peg$c62 = function(shell) { return { type: `shell`, shell, quoted: true } },
+      peg$c63 = function(variable) { return { type: `variable`, ...variable, quoted: true } },
+      peg$c64 = function(text) { return { type: `text`, text } },
+      peg$c65 = function(arithmetic) { return { type: `arithmetic`, arithmetic, quoted: false} },
+      peg$c66 = function(shell) { return { type: `shell`, shell, quoted: false } },
+      peg$c67 = function(variable) { return { type: `variable`, ...variable, quoted: false } },
+      peg$c68 = function(pattern) { return { type: `glob`, pattern } },
+      peg$c69 = "\\",
+      peg$c70 = peg$literalExpectation("\\", false),
+      peg$c71 = /^[\\']/,
+      peg$c72 = peg$classExpectation(["\\", "'"], false, false),
+      peg$c73 = function(c) { return c },
+      peg$c74 = /^[^']/,
+      peg$c75 = peg$classExpectation(["'"], true, false),
+      peg$c76 = function(chars) { return chars.join(``) },
+      peg$c77 = /^[\\$"]/,
+      peg$c78 = peg$classExpectation(["\\", "$", "\""], false, false),
+      peg$c79 = /^[^$"]/,
+      peg$c80 = peg$classExpectation(["$", "\""], true, false),
+      peg$c81 = "\\0",
+      peg$c82 = peg$literalExpectation("\\0", false),
+      peg$c83 = function() { return '\0' },
+      peg$c84 = "\\a",
+      peg$c85 = peg$literalExpectation("\\a", false),
+      peg$c86 = function() { return '\a' },
+      peg$c87 = "\\b",
+      peg$c88 = peg$literalExpectation("\\b", false),
+      peg$c89 = function() { return '\b' },
+      peg$c90 = "\\e",
+      peg$c91 = peg$literalExpectation("\\e", false),
+      peg$c92 = function() { return '\x1b' },
+      peg$c93 = "\\f",
+      peg$c94 = peg$literalExpectation("\\f", false),
+      peg$c95 = function() { return '\f' },
+      peg$c96 = "\\n",
+      peg$c97 = peg$literalExpectation("\\n", false),
+      peg$c98 = function() { return '\n' },
+      peg$c99 = "\\r",
+      peg$c100 = peg$literalExpectation("\\r", false),
+      peg$c101 = function() { return '\r' },
+      peg$c102 = "\\t",
+      peg$c103 = peg$literalExpectation("\\t", false),
+      peg$c104 = function() { return '\t' },
+      peg$c105 = "\\v",
+      peg$c106 = peg$literalExpectation("\\v", false),
+      peg$c107 = function() { return '\v' },
+      peg$c108 = "\\x",
+      peg$c109 = peg$literalExpectation("\\x", false),
+      peg$c110 = function(c) { return String.fromCharCode(parseInt(c, 16)) },
+      peg$c111 = "\\u",
+      peg$c112 = peg$literalExpectation("\\u", false),
+      peg$c113 = "\\U",
+      peg$c114 = peg$literalExpectation("\\U", false),
+      peg$c115 = function(c) { return String.fromCodePoint(parseInt(c, 16)) },
+      peg$c116 = /^[0-9a-fA-f]/,
+      peg$c117 = peg$classExpectation([["0", "9"], ["a", "f"], ["A", "f"]], false, false),
+      peg$c118 = peg$anyExpectation(),
+      peg$c119 = "-",
+      peg$c120 = peg$literalExpectation("-", false),
+      peg$c121 = "+",
+      peg$c122 = peg$literalExpectation("+", false),
+      peg$c123 = ".",
+      peg$c124 = peg$literalExpectation(".", false),
+      peg$c125 = function(sign, left, right) { return { type: `number`, value: (sign === '-' ? -1 : 1) * parseFloat(left.join(``) + `.` + right.join(``)) } },
+      peg$c126 = function(sign, value) { return { type: `number`, value: (sign === '-' ? -1 : 1) *  parseInt(value.join(``)) } },
+      peg$c127 = function(variable) { return { type: `variable`, ...variable } },
+      peg$c128 = function(name) { return { type: `variable`, name } },
+      peg$c129 = function(value) { return value },
+      peg$c130 = "*",
+      peg$c131 = peg$literalExpectation("*", false),
+      peg$c132 = "/",
+      peg$c133 = peg$literalExpectation("/", false),
+      peg$c134 = function(left, op, right) { return { type: op === `*` ? `multiplication` : `division`, right } },
+      peg$c135 = function(left, rest) {
+          return rest.reduce((left, right) => ({ left, ...right }), left)
+        },
+      peg$c136 = function(left, op, right) { return { type: op === `+` ? `addition` : `subtraction`, right } },
+      peg$c137 = "$((",
+      peg$c138 = peg$literalExpectation("$((", false),
+      peg$c139 = "))",
+      peg$c140 = peg$literalExpectation("))", false),
+      peg$c141 = function(arithmetic) { return arithmetic },
+      peg$c142 = "$(",
+      peg$c143 = peg$literalExpectation("$(", false),
+      peg$c144 = function(command) { return command },
+      peg$c145 = "${",
+      peg$c146 = peg$literalExpectation("${", false),
+      peg$c147 = ":-",
+      peg$c148 = peg$literalExpectation(":-", false),
+      peg$c149 = function(name, arg) { return { name, defaultValue: arg } },
+      peg$c150 = ":-}",
+      peg$c151 = peg$literalExpectation(":-}", false),
+      peg$c152 = function(name) { return { name, defaultValue: [] } },
+      peg$c153 = function(name) { return { name } },
+      peg$c154 = "$",
+      peg$c155 = peg$literalExpectation("$", false),
+      peg$c156 = function(pattern) { return options.isGlobPattern(pattern) },
+      peg$c157 = function(pattern) { return pattern },
+      peg$c158 = /^[a-zA-Z0-9_]/,
+      peg$c159 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false),
+      peg$c160 = function() { return text() },
+      peg$c161 = /^[$@*?#a-zA-Z0-9_\-]/,
+      peg$c162 = peg$classExpectation(["$", "@", "*", "?", "#", ["a", "z"], ["A", "Z"], ["0", "9"], "_", "-"], false, false),
+      peg$c163 = /^[(){}<>$|&; \t"']/,
+      peg$c164 = peg$classExpectation(["(", ")", "{", "}", "<", ">", "$", "|", "&", ";", " ", "\t", "\"", "'"], false, false),
+      peg$c165 = /^[<>&; \t"']/,
+      peg$c166 = peg$classExpectation(["<", ">", "&", ";", " ", "\t", "\"", "'"], false, false),
+      peg$c167 = /^[ \t]/,
+      peg$c168 = peg$classExpectation([" ", "\t"], false, false),
 
       peg$currPos          = 0,
       peg$savedPos         = 0,
@@ -13874,6 +14742,15 @@ function peg$parse(input, options) {
       s0 = peg$FAILED;
       if (peg$silentFails === 0) { peg$fail(peg$c5); }
     }
+    if (s0 === peg$FAILED) {
+      if (input.charCodeAt(peg$currPos) === 38) {
+        s0 = peg$c6;
+        peg$currPos++;
+      } else {
+        s0 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$c7); }
+      }
+    }
 
     return s0;
   }
@@ -13890,7 +14767,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c6(s1, s2);
+        s1 = peg$c8(s1, s2);
         s0 = s1;
       } else {
         peg$currPos = s0;
@@ -13934,7 +14811,7 @@ function peg$parse(input, options) {
             }
             if (s5 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c7(s2, s4);
+              s1 = peg$c9(s2, s4);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -13963,20 +14840,20 @@ function peg$parse(input, options) {
   function peg$parseCommandLineType() {
     var s0;
 
-    if (input.substr(peg$currPos, 2) === peg$c8) {
-      s0 = peg$c8;
+    if (input.substr(peg$currPos, 2) === peg$c10) {
+      s0 = peg$c10;
       peg$currPos += 2;
     } else {
       s0 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c9); }
+      if (peg$silentFails === 0) { peg$fail(peg$c11); }
     }
     if (s0 === peg$FAILED) {
-      if (input.substr(peg$currPos, 2) === peg$c10) {
-        s0 = peg$c10;
+      if (input.substr(peg$currPos, 2) === peg$c12) {
+        s0 = peg$c12;
         peg$currPos += 2;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c11); }
+        if (peg$silentFails === 0) { peg$fail(peg$c13); }
       }
     }
 
@@ -13995,7 +14872,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c12(s1, s2);
+        s1 = peg$c14(s1, s2);
         s0 = s1;
       } else {
         peg$currPos = s0;
@@ -14039,7 +14916,7 @@ function peg$parse(input, options) {
             }
             if (s5 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c13(s2, s4);
+              s1 = peg$c15(s2, s4);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -14068,20 +14945,20 @@ function peg$parse(input, options) {
   function peg$parseCommandChainType() {
     var s0;
 
-    if (input.substr(peg$currPos, 2) === peg$c14) {
-      s0 = peg$c14;
+    if (input.substr(peg$currPos, 2) === peg$c16) {
+      s0 = peg$c16;
       peg$currPos += 2;
     } else {
       s0 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c15); }
+      if (peg$silentFails === 0) { peg$fail(peg$c17); }
     }
     if (s0 === peg$FAILED) {
       if (input.charCodeAt(peg$currPos) === 124) {
-        s0 = peg$c16;
+        s0 = peg$c18;
         peg$currPos++;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c17); }
+        if (peg$silentFails === 0) { peg$fail(peg$c19); }
       }
     }
 
@@ -14095,11 +14972,11 @@ function peg$parse(input, options) {
     s1 = peg$parseEnvVariable();
     if (s1 !== peg$FAILED) {
       if (input.charCodeAt(peg$currPos) === 61) {
-        s2 = peg$c18;
+        s2 = peg$c20;
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c19); }
+        if (peg$silentFails === 0) { peg$fail(peg$c21); }
       }
       if (s2 !== peg$FAILED) {
         s3 = peg$parseStrictValueArgument();
@@ -14112,7 +14989,7 @@ function peg$parse(input, options) {
           }
           if (s4 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c20(s1, s3);
+            s1 = peg$c22(s1, s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -14135,11 +15012,11 @@ function peg$parse(input, options) {
       s1 = peg$parseEnvVariable();
       if (s1 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 61) {
-          s2 = peg$c18;
+          s2 = peg$c20;
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c19); }
+          if (peg$silentFails === 0) { peg$fail(peg$c21); }
         }
         if (s2 !== peg$FAILED) {
           s3 = [];
@@ -14150,7 +15027,7 @@ function peg$parse(input, options) {
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c21(s1);
+            s1 = peg$c23(s1);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -14181,11 +15058,11 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       if (input.charCodeAt(peg$currPos) === 40) {
-        s2 = peg$c22;
+        s2 = peg$c24;
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c23); }
+        if (peg$silentFails === 0) { peg$fail(peg$c25); }
       }
       if (s2 !== peg$FAILED) {
         s3 = [];
@@ -14205,11 +15082,11 @@ function peg$parse(input, options) {
             }
             if (s5 !== peg$FAILED) {
               if (input.charCodeAt(peg$currPos) === 41) {
-                s6 = peg$c24;
+                s6 = peg$c26;
                 peg$currPos++;
               } else {
                 s6 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c25); }
+                if (peg$silentFails === 0) { peg$fail(peg$c27); }
               }
               if (s6 !== peg$FAILED) {
                 s7 = [];
@@ -14234,7 +15111,7 @@ function peg$parse(input, options) {
                     }
                     if (s9 !== peg$FAILED) {
                       peg$savedPos = s0;
-                      s1 = peg$c26(s4, s8);
+                      s1 = peg$c28(s4, s8);
                       s0 = s1;
                     } else {
                       peg$currPos = s0;
@@ -14282,11 +15159,11 @@ function peg$parse(input, options) {
       }
       if (s1 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 123) {
-          s2 = peg$c27;
+          s2 = peg$c29;
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c28); }
+          if (peg$silentFails === 0) { peg$fail(peg$c30); }
         }
         if (s2 !== peg$FAILED) {
           s3 = [];
@@ -14306,11 +15183,11 @@ function peg$parse(input, options) {
               }
               if (s5 !== peg$FAILED) {
                 if (input.charCodeAt(peg$currPos) === 125) {
-                  s6 = peg$c29;
+                  s6 = peg$c31;
                   peg$currPos++;
                 } else {
                   s6 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c30); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c32); }
                 }
                 if (s6 !== peg$FAILED) {
                   s7 = [];
@@ -14335,7 +15212,7 @@ function peg$parse(input, options) {
                       }
                       if (s9 !== peg$FAILED) {
                         peg$savedPos = s0;
-                        s1 = peg$c31(s4, s8);
+                        s1 = peg$c33(s4, s8);
                         s0 = s1;
                       } else {
                         peg$currPos = s0;
@@ -14415,7 +15292,7 @@ function peg$parse(input, options) {
                 }
                 if (s5 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c32(s2, s4);
+                  s1 = peg$c34(s2, s4);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -14465,7 +15342,7 @@ function peg$parse(input, options) {
               }
               if (s3 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c33(s2);
+                s1 = peg$c35(s2);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -14516,7 +15393,7 @@ function peg$parse(input, options) {
         }
         if (s3 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c34(s2);
+          s1 = peg$c36(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -14548,7 +15425,7 @@ function peg$parse(input, options) {
       s2 = peg$parseRedirectArgument();
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c35(s2);
+        s1 = peg$c37(s2);
         s0 = s1;
       } else {
         peg$currPos = s0;
@@ -14570,7 +15447,7 @@ function peg$parse(input, options) {
         s2 = peg$parseValueArgument();
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c35(s2);
+          s1 = peg$c37(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -14586,7 +15463,7 @@ function peg$parse(input, options) {
   }
 
   function peg$parseRedirectArgument() {
-    var s0, s1, s2, s3;
+    var s0, s1, s2, s3, s4;
 
     s0 = peg$currPos;
     s1 = [];
@@ -14596,13 +15473,28 @@ function peg$parse(input, options) {
       s2 = peg$parseS();
     }
     if (s1 !== peg$FAILED) {
-      s2 = peg$parseRedirectType();
+      if (peg$c38.test(input.charAt(peg$currPos))) {
+        s2 = input.charAt(peg$currPos);
+        peg$currPos++;
+      } else {
+        s2 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$c39); }
+      }
+      if (s2 === peg$FAILED) {
+        s2 = null;
+      }
       if (s2 !== peg$FAILED) {
-        s3 = peg$parseValueArgument();
+        s3 = peg$parseRedirectType();
         if (s3 !== peg$FAILED) {
-          peg$savedPos = s0;
-          s1 = peg$c36(s2, s3);
-          s0 = s1;
+          s4 = peg$parseValueArgument();
+          if (s4 !== peg$FAILED) {
+            peg$savedPos = s0;
+            s1 = peg$c40(s2, s3, s4);
+            s0 = s1;
+          } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
+          }
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;
@@ -14622,52 +15514,52 @@ function peg$parse(input, options) {
   function peg$parseRedirectType() {
     var s0;
 
-    if (input.substr(peg$currPos, 2) === peg$c37) {
-      s0 = peg$c37;
+    if (input.substr(peg$currPos, 2) === peg$c41) {
+      s0 = peg$c41;
       peg$currPos += 2;
     } else {
       s0 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c38); }
+      if (peg$silentFails === 0) { peg$fail(peg$c42); }
     }
     if (s0 === peg$FAILED) {
-      if (input.substr(peg$currPos, 2) === peg$c39) {
-        s0 = peg$c39;
+      if (input.substr(peg$currPos, 2) === peg$c43) {
+        s0 = peg$c43;
         peg$currPos += 2;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c40); }
+        if (peg$silentFails === 0) { peg$fail(peg$c44); }
       }
       if (s0 === peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 62) {
-          s0 = peg$c41;
+          s0 = peg$c45;
           peg$currPos++;
         } else {
           s0 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c42); }
+          if (peg$silentFails === 0) { peg$fail(peg$c46); }
         }
         if (s0 === peg$FAILED) {
-          if (input.substr(peg$currPos, 3) === peg$c43) {
-            s0 = peg$c43;
+          if (input.substr(peg$currPos, 3) === peg$c47) {
+            s0 = peg$c47;
             peg$currPos += 3;
           } else {
             s0 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c44); }
+            if (peg$silentFails === 0) { peg$fail(peg$c48); }
           }
           if (s0 === peg$FAILED) {
-            if (input.substr(peg$currPos, 2) === peg$c45) {
-              s0 = peg$c45;
+            if (input.substr(peg$currPos, 2) === peg$c49) {
+              s0 = peg$c49;
               peg$currPos += 2;
             } else {
               s0 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c46); }
+              if (peg$silentFails === 0) { peg$fail(peg$c50); }
             }
             if (s0 === peg$FAILED) {
               if (input.charCodeAt(peg$currPos) === 60) {
-                s0 = peg$c47;
+                s0 = peg$c51;
                 peg$currPos++;
               } else {
                 s0 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c48); }
+                if (peg$silentFails === 0) { peg$fail(peg$c52); }
               }
             }
           }
@@ -14692,7 +15584,7 @@ function peg$parse(input, options) {
       s2 = peg$parseStrictValueArgument();
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c35(s2);
+        s1 = peg$c37(s2);
         s0 = s1;
       } else {
         peg$currPos = s0;
@@ -14722,7 +15614,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c49(s1);
+      s1 = peg$c53(s1);
     }
     s0 = s1;
 
@@ -14736,7 +15628,7 @@ function peg$parse(input, options) {
     s1 = peg$parseSglQuoteString();
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c50(s1);
+      s1 = peg$c54(s1);
     }
     s0 = s1;
     if (s0 === peg$FAILED) {
@@ -14744,7 +15636,7 @@ function peg$parse(input, options) {
       s1 = peg$parseDblQuoteString();
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c50(s1);
+        s1 = peg$c54(s1);
       }
       s0 = s1;
       if (s0 === peg$FAILED) {
@@ -14752,7 +15644,7 @@ function peg$parse(input, options) {
         s1 = peg$parsePlainString();
         if (s1 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c50(s1);
+          s1 = peg$c54(s1);
         }
         s0 = s1;
       }
@@ -14766,25 +15658,25 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     if (input.charCodeAt(peg$currPos) === 39) {
-      s1 = peg$c51;
+      s1 = peg$c55;
       peg$currPos++;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c52); }
+      if (peg$silentFails === 0) { peg$fail(peg$c56); }
     }
     if (s1 !== peg$FAILED) {
       s2 = peg$parseSglQuoteStringText();
       if (s2 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 39) {
-          s3 = peg$c51;
+          s3 = peg$c55;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c52); }
+          if (peg$silentFails === 0) { peg$fail(peg$c56); }
         }
         if (s3 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c53(s2);
+          s1 = peg$c57(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -14807,11 +15699,11 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     if (input.charCodeAt(peg$currPos) === 34) {
-      s1 = peg$c54;
+      s1 = peg$c58;
       peg$currPos++;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c55); }
+      if (peg$silentFails === 0) { peg$fail(peg$c59); }
     }
     if (s1 !== peg$FAILED) {
       s2 = [];
@@ -14822,15 +15714,15 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 34) {
-          s3 = peg$c54;
+          s3 = peg$c58;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c55); }
+          if (peg$silentFails === 0) { peg$fail(peg$c59); }
         }
         if (s3 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c56(s2);
+          s1 = peg$c60(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -14864,7 +15756,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c56(s1);
+      s1 = peg$c60(s1);
     }
     s0 = s1;
 
@@ -14872,47 +15764,6 @@ function peg$parse(input, options) {
   }
 
   function peg$parseDblQuoteStringSegment() {
-    var s0, s1;
-
-    s0 = peg$currPos;
-    s1 = peg$parseArithmetic();
-    if (s1 !== peg$FAILED) {
-      peg$savedPos = s0;
-      s1 = peg$c57(s1);
-    }
-    s0 = s1;
-    if (s0 === peg$FAILED) {
-      s0 = peg$currPos;
-      s1 = peg$parseSubshell();
-      if (s1 !== peg$FAILED) {
-        peg$savedPos = s0;
-        s1 = peg$c58(s1);
-      }
-      s0 = s1;
-      if (s0 === peg$FAILED) {
-        s0 = peg$currPos;
-        s1 = peg$parseVariable();
-        if (s1 !== peg$FAILED) {
-          peg$savedPos = s0;
-          s1 = peg$c59(s1);
-        }
-        s0 = s1;
-        if (s0 === peg$FAILED) {
-          s0 = peg$currPos;
-          s1 = peg$parseDblQuoteStringText();
-          if (s1 !== peg$FAILED) {
-            peg$savedPos = s0;
-            s1 = peg$c60(s1);
-          }
-          s0 = s1;
-        }
-      }
-    }
-
-    return s0;
-  }
-
-  function peg$parsePlainStringSegment() {
     var s0, s1;
 
     s0 = peg$currPos;
@@ -14940,10 +15791,51 @@ function peg$parse(input, options) {
         s0 = s1;
         if (s0 === peg$FAILED) {
           s0 = peg$currPos;
-          s1 = peg$parseGlob();
+          s1 = peg$parseDblQuoteStringText();
           if (s1 !== peg$FAILED) {
             peg$savedPos = s0;
             s1 = peg$c64(s1);
+          }
+          s0 = s1;
+        }
+      }
+    }
+
+    return s0;
+  }
+
+  function peg$parsePlainStringSegment() {
+    var s0, s1;
+
+    s0 = peg$currPos;
+    s1 = peg$parseArithmetic();
+    if (s1 !== peg$FAILED) {
+      peg$savedPos = s0;
+      s1 = peg$c65(s1);
+    }
+    s0 = s1;
+    if (s0 === peg$FAILED) {
+      s0 = peg$currPos;
+      s1 = peg$parseSubshell();
+      if (s1 !== peg$FAILED) {
+        peg$savedPos = s0;
+        s1 = peg$c66(s1);
+      }
+      s0 = s1;
+      if (s0 === peg$FAILED) {
+        s0 = peg$currPos;
+        s1 = peg$parseVariable();
+        if (s1 !== peg$FAILED) {
+          peg$savedPos = s0;
+          s1 = peg$c67(s1);
+        }
+        s0 = s1;
+        if (s0 === peg$FAILED) {
+          s0 = peg$currPos;
+          s1 = peg$parseGlob();
+          if (s1 !== peg$FAILED) {
+            peg$savedPos = s0;
+            s1 = peg$c68(s1);
           }
           s0 = s1;
           if (s0 === peg$FAILED) {
@@ -14951,7 +15843,7 @@ function peg$parse(input, options) {
             s1 = peg$parsePlainStringText();
             if (s1 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c60(s1);
+              s1 = peg$c64(s1);
             }
             s0 = s1;
           }
@@ -14967,86 +15859,98 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     s1 = [];
-    s2 = peg$currPos;
-    if (input.charCodeAt(peg$currPos) === 92) {
-      s3 = peg$c65;
-      peg$currPos++;
-    } else {
-      s3 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c66); }
-    }
-    if (s3 !== peg$FAILED) {
-      if (input.length > peg$currPos) {
-        s4 = input.charAt(peg$currPos);
-        peg$currPos++;
-      } else {
-        s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c67); }
-      }
-      if (s4 !== peg$FAILED) {
-        peg$savedPos = s2;
-        s3 = peg$c68(s4);
-        s2 = s3;
-      } else {
-        peg$currPos = s2;
-        s2 = peg$FAILED;
-      }
-    } else {
-      peg$currPos = s2;
-      s2 = peg$FAILED;
-    }
+    s2 = peg$parseEscapedChar();
     if (s2 === peg$FAILED) {
-      if (peg$c69.test(input.charAt(peg$currPos))) {
-        s2 = input.charAt(peg$currPos);
-        peg$currPos++;
-      } else {
-        s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c70); }
-      }
-    }
-    while (s2 !== peg$FAILED) {
-      s1.push(s2);
-      s2 = peg$currPos;
-      if (input.charCodeAt(peg$currPos) === 92) {
-        s3 = peg$c65;
-        peg$currPos++;
-      } else {
-        s3 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c66); }
-      }
-      if (s3 !== peg$FAILED) {
-        if (input.length > peg$currPos) {
-          s4 = input.charAt(peg$currPos);
+      s2 = peg$parseHexCodeString();
+      if (s2 === peg$FAILED) {
+        s2 = peg$currPos;
+        if (input.charCodeAt(peg$currPos) === 92) {
+          s3 = peg$c69;
           peg$currPos++;
         } else {
-          s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c67); }
+          s3 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c70); }
         }
-        if (s4 !== peg$FAILED) {
-          peg$savedPos = s2;
-          s3 = peg$c68(s4);
-          s2 = s3;
+        if (s3 !== peg$FAILED) {
+          if (peg$c71.test(input.charAt(peg$currPos))) {
+            s4 = input.charAt(peg$currPos);
+            peg$currPos++;
+          } else {
+            s4 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c72); }
+          }
+          if (s4 !== peg$FAILED) {
+            peg$savedPos = s2;
+            s3 = peg$c73(s4);
+            s2 = s3;
+          } else {
+            peg$currPos = s2;
+            s2 = peg$FAILED;
+          }
         } else {
           peg$currPos = s2;
           s2 = peg$FAILED;
         }
-      } else {
-        peg$currPos = s2;
-        s2 = peg$FAILED;
+        if (s2 === peg$FAILED) {
+          if (peg$c74.test(input.charAt(peg$currPos))) {
+            s2 = input.charAt(peg$currPos);
+            peg$currPos++;
+          } else {
+            s2 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c75); }
+          }
+        }
       }
+    }
+    while (s2 !== peg$FAILED) {
+      s1.push(s2);
+      s2 = peg$parseEscapedChar();
       if (s2 === peg$FAILED) {
-        if (peg$c69.test(input.charAt(peg$currPos))) {
-          s2 = input.charAt(peg$currPos);
-          peg$currPos++;
-        } else {
-          s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c70); }
+        s2 = peg$parseHexCodeString();
+        if (s2 === peg$FAILED) {
+          s2 = peg$currPos;
+          if (input.charCodeAt(peg$currPos) === 92) {
+            s3 = peg$c69;
+            peg$currPos++;
+          } else {
+            s3 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c70); }
+          }
+          if (s3 !== peg$FAILED) {
+            if (peg$c71.test(input.charAt(peg$currPos))) {
+              s4 = input.charAt(peg$currPos);
+              peg$currPos++;
+            } else {
+              s4 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c72); }
+            }
+            if (s4 !== peg$FAILED) {
+              peg$savedPos = s2;
+              s3 = peg$c73(s4);
+              s2 = s3;
+            } else {
+              peg$currPos = s2;
+              s2 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s2;
+            s2 = peg$FAILED;
+          }
+          if (s2 === peg$FAILED) {
+            if (peg$c74.test(input.charAt(peg$currPos))) {
+              s2 = input.charAt(peg$currPos);
+              peg$currPos++;
+            } else {
+              s2 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c75); }
+            }
+          }
         }
       }
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c71(s1);
+      s1 = peg$c76(s1);
     }
     s0 = s1;
 
@@ -15058,65 +15962,29 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     s1 = [];
-    s2 = peg$currPos;
-    if (input.charCodeAt(peg$currPos) === 92) {
-      s3 = peg$c65;
-      peg$currPos++;
-    } else {
-      s3 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c66); }
-    }
-    if (s3 !== peg$FAILED) {
-      if (input.length > peg$currPos) {
-        s4 = input.charAt(peg$currPos);
-        peg$currPos++;
-      } else {
-        s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c67); }
-      }
-      if (s4 !== peg$FAILED) {
-        peg$savedPos = s2;
-        s3 = peg$c68(s4);
-        s2 = s3;
-      } else {
-        peg$currPos = s2;
-        s2 = peg$FAILED;
-      }
-    } else {
-      peg$currPos = s2;
-      s2 = peg$FAILED;
-    }
+    s2 = peg$parseEscapedChar();
     if (s2 === peg$FAILED) {
-      if (peg$c72.test(input.charAt(peg$currPos))) {
-        s2 = input.charAt(peg$currPos);
-        peg$currPos++;
-      } else {
-        s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c73); }
-      }
-    }
-    if (s2 !== peg$FAILED) {
-      while (s2 !== peg$FAILED) {
-        s1.push(s2);
+      s2 = peg$parseHexCodeString();
+      if (s2 === peg$FAILED) {
         s2 = peg$currPos;
         if (input.charCodeAt(peg$currPos) === 92) {
-          s3 = peg$c65;
+          s3 = peg$c69;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c66); }
+          if (peg$silentFails === 0) { peg$fail(peg$c70); }
         }
         if (s3 !== peg$FAILED) {
-          if (input.length > peg$currPos) {
+          if (peg$c77.test(input.charAt(peg$currPos))) {
             s4 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c67); }
+            if (peg$silentFails === 0) { peg$fail(peg$c78); }
           }
           if (s4 !== peg$FAILED) {
             peg$savedPos = s2;
-            s3 = peg$c68(s4);
+            s3 = peg$c73(s4);
             s2 = s3;
           } else {
             peg$currPos = s2;
@@ -15127,12 +15995,60 @@ function peg$parse(input, options) {
           s2 = peg$FAILED;
         }
         if (s2 === peg$FAILED) {
-          if (peg$c72.test(input.charAt(peg$currPos))) {
+          if (peg$c79.test(input.charAt(peg$currPos))) {
             s2 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s2 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c73); }
+            if (peg$silentFails === 0) { peg$fail(peg$c80); }
+          }
+        }
+      }
+    }
+    if (s2 !== peg$FAILED) {
+      while (s2 !== peg$FAILED) {
+        s1.push(s2);
+        s2 = peg$parseEscapedChar();
+        if (s2 === peg$FAILED) {
+          s2 = peg$parseHexCodeString();
+          if (s2 === peg$FAILED) {
+            s2 = peg$currPos;
+            if (input.charCodeAt(peg$currPos) === 92) {
+              s3 = peg$c69;
+              peg$currPos++;
+            } else {
+              s3 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c70); }
+            }
+            if (s3 !== peg$FAILED) {
+              if (peg$c77.test(input.charAt(peg$currPos))) {
+                s4 = input.charAt(peg$currPos);
+                peg$currPos++;
+              } else {
+                s4 = peg$FAILED;
+                if (peg$silentFails === 0) { peg$fail(peg$c78); }
+              }
+              if (s4 !== peg$FAILED) {
+                peg$savedPos = s2;
+                s3 = peg$c73(s4);
+                s2 = s3;
+              } else {
+                peg$currPos = s2;
+                s2 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s2;
+              s2 = peg$FAILED;
+            }
+            if (s2 === peg$FAILED) {
+              if (peg$c79.test(input.charAt(peg$currPos))) {
+                s2 = input.charAt(peg$currPos);
+                peg$currPos++;
+              } else {
+                s2 = peg$FAILED;
+                if (peg$silentFails === 0) { peg$fail(peg$c80); }
+              }
+            }
           }
         }
       }
@@ -15141,9 +16057,348 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c71(s1);
+      s1 = peg$c76(s1);
     }
     s0 = s1;
+
+    return s0;
+  }
+
+  function peg$parseEscapedChar() {
+    var s0, s1;
+
+    s0 = peg$currPos;
+    if (input.substr(peg$currPos, 2) === peg$c81) {
+      s1 = peg$c81;
+      peg$currPos += 2;
+    } else {
+      s1 = peg$FAILED;
+      if (peg$silentFails === 0) { peg$fail(peg$c82); }
+    }
+    if (s1 !== peg$FAILED) {
+      peg$savedPos = s0;
+      s1 = peg$c83();
+    }
+    s0 = s1;
+    if (s0 === peg$FAILED) {
+      s0 = peg$currPos;
+      if (input.substr(peg$currPos, 2) === peg$c84) {
+        s1 = peg$c84;
+        peg$currPos += 2;
+      } else {
+        s1 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$c85); }
+      }
+      if (s1 !== peg$FAILED) {
+        peg$savedPos = s0;
+        s1 = peg$c86();
+      }
+      s0 = s1;
+      if (s0 === peg$FAILED) {
+        s0 = peg$currPos;
+        if (input.substr(peg$currPos, 2) === peg$c87) {
+          s1 = peg$c87;
+          peg$currPos += 2;
+        } else {
+          s1 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c88); }
+        }
+        if (s1 !== peg$FAILED) {
+          peg$savedPos = s0;
+          s1 = peg$c89();
+        }
+        s0 = s1;
+        if (s0 === peg$FAILED) {
+          s0 = peg$currPos;
+          if (input.substr(peg$currPos, 2) === peg$c90) {
+            s1 = peg$c90;
+            peg$currPos += 2;
+          } else {
+            s1 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c91); }
+          }
+          if (s1 !== peg$FAILED) {
+            peg$savedPos = s0;
+            s1 = peg$c92();
+          }
+          s0 = s1;
+          if (s0 === peg$FAILED) {
+            s0 = peg$currPos;
+            if (input.substr(peg$currPos, 2) === peg$c93) {
+              s1 = peg$c93;
+              peg$currPos += 2;
+            } else {
+              s1 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c94); }
+            }
+            if (s1 !== peg$FAILED) {
+              peg$savedPos = s0;
+              s1 = peg$c95();
+            }
+            s0 = s1;
+            if (s0 === peg$FAILED) {
+              s0 = peg$currPos;
+              if (input.substr(peg$currPos, 2) === peg$c96) {
+                s1 = peg$c96;
+                peg$currPos += 2;
+              } else {
+                s1 = peg$FAILED;
+                if (peg$silentFails === 0) { peg$fail(peg$c97); }
+              }
+              if (s1 !== peg$FAILED) {
+                peg$savedPos = s0;
+                s1 = peg$c98();
+              }
+              s0 = s1;
+              if (s0 === peg$FAILED) {
+                s0 = peg$currPos;
+                if (input.substr(peg$currPos, 2) === peg$c99) {
+                  s1 = peg$c99;
+                  peg$currPos += 2;
+                } else {
+                  s1 = peg$FAILED;
+                  if (peg$silentFails === 0) { peg$fail(peg$c100); }
+                }
+                if (s1 !== peg$FAILED) {
+                  peg$savedPos = s0;
+                  s1 = peg$c101();
+                }
+                s0 = s1;
+                if (s0 === peg$FAILED) {
+                  s0 = peg$currPos;
+                  if (input.substr(peg$currPos, 2) === peg$c102) {
+                    s1 = peg$c102;
+                    peg$currPos += 2;
+                  } else {
+                    s1 = peg$FAILED;
+                    if (peg$silentFails === 0) { peg$fail(peg$c103); }
+                  }
+                  if (s1 !== peg$FAILED) {
+                    peg$savedPos = s0;
+                    s1 = peg$c104();
+                  }
+                  s0 = s1;
+                  if (s0 === peg$FAILED) {
+                    s0 = peg$currPos;
+                    if (input.substr(peg$currPos, 2) === peg$c105) {
+                      s1 = peg$c105;
+                      peg$currPos += 2;
+                    } else {
+                      s1 = peg$FAILED;
+                      if (peg$silentFails === 0) { peg$fail(peg$c106); }
+                    }
+                    if (s1 !== peg$FAILED) {
+                      peg$savedPos = s0;
+                      s1 = peg$c107();
+                    }
+                    s0 = s1;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return s0;
+  }
+
+  function peg$parseHexCodeString() {
+    var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
+
+    s0 = peg$currPos;
+    if (input.substr(peg$currPos, 2) === peg$c108) {
+      s1 = peg$c108;
+      peg$currPos += 2;
+    } else {
+      s1 = peg$FAILED;
+      if (peg$silentFails === 0) { peg$fail(peg$c109); }
+    }
+    if (s1 !== peg$FAILED) {
+      s2 = peg$currPos;
+      s3 = peg$currPos;
+      s4 = peg$parseHexCodeChar();
+      if (s4 !== peg$FAILED) {
+        s5 = peg$parseHexCodeChar();
+        if (s5 !== peg$FAILED) {
+          s4 = [s4, s5];
+          s3 = s4;
+        } else {
+          peg$currPos = s3;
+          s3 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s3;
+        s3 = peg$FAILED;
+      }
+      if (s3 !== peg$FAILED) {
+        s2 = input.substring(s2, peg$currPos);
+      } else {
+        s2 = s3;
+      }
+      if (s2 !== peg$FAILED) {
+        peg$savedPos = s0;
+        s1 = peg$c110(s2);
+        s0 = s1;
+      } else {
+        peg$currPos = s0;
+        s0 = peg$FAILED;
+      }
+    } else {
+      peg$currPos = s0;
+      s0 = peg$FAILED;
+    }
+    if (s0 === peg$FAILED) {
+      s0 = peg$currPos;
+      if (input.substr(peg$currPos, 2) === peg$c111) {
+        s1 = peg$c111;
+        peg$currPos += 2;
+      } else {
+        s1 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$c112); }
+      }
+      if (s1 !== peg$FAILED) {
+        s2 = peg$currPos;
+        s3 = peg$currPos;
+        s4 = peg$parseHexCodeChar();
+        if (s4 !== peg$FAILED) {
+          s5 = peg$parseHexCodeChar();
+          if (s5 !== peg$FAILED) {
+            s6 = peg$parseHexCodeChar();
+            if (s6 !== peg$FAILED) {
+              s7 = peg$parseHexCodeChar();
+              if (s7 !== peg$FAILED) {
+                s4 = [s4, s5, s6, s7];
+                s3 = s4;
+              } else {
+                peg$currPos = s3;
+                s3 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s3;
+              s3 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s3;
+            s3 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s3;
+          s3 = peg$FAILED;
+        }
+        if (s3 !== peg$FAILED) {
+          s2 = input.substring(s2, peg$currPos);
+        } else {
+          s2 = s3;
+        }
+        if (s2 !== peg$FAILED) {
+          peg$savedPos = s0;
+          s1 = peg$c110(s2);
+          s0 = s1;
+        } else {
+          peg$currPos = s0;
+          s0 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s0;
+        s0 = peg$FAILED;
+      }
+      if (s0 === peg$FAILED) {
+        s0 = peg$currPos;
+        if (input.substr(peg$currPos, 2) === peg$c113) {
+          s1 = peg$c113;
+          peg$currPos += 2;
+        } else {
+          s1 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c114); }
+        }
+        if (s1 !== peg$FAILED) {
+          s2 = peg$currPos;
+          s3 = peg$currPos;
+          s4 = peg$parseHexCodeChar();
+          if (s4 !== peg$FAILED) {
+            s5 = peg$parseHexCodeChar();
+            if (s5 !== peg$FAILED) {
+              s6 = peg$parseHexCodeChar();
+              if (s6 !== peg$FAILED) {
+                s7 = peg$parseHexCodeChar();
+                if (s7 !== peg$FAILED) {
+                  s8 = peg$parseHexCodeChar();
+                  if (s8 !== peg$FAILED) {
+                    s9 = peg$parseHexCodeChar();
+                    if (s9 !== peg$FAILED) {
+                      s10 = peg$parseHexCodeChar();
+                      if (s10 !== peg$FAILED) {
+                        s11 = peg$parseHexCodeChar();
+                        if (s11 !== peg$FAILED) {
+                          s4 = [s4, s5, s6, s7, s8, s9, s10, s11];
+                          s3 = s4;
+                        } else {
+                          peg$currPos = s3;
+                          s3 = peg$FAILED;
+                        }
+                      } else {
+                        peg$currPos = s3;
+                        s3 = peg$FAILED;
+                      }
+                    } else {
+                      peg$currPos = s3;
+                      s3 = peg$FAILED;
+                    }
+                  } else {
+                    peg$currPos = s3;
+                    s3 = peg$FAILED;
+                  }
+                } else {
+                  peg$currPos = s3;
+                  s3 = peg$FAILED;
+                }
+              } else {
+                peg$currPos = s3;
+                s3 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s3;
+              s3 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s3;
+            s3 = peg$FAILED;
+          }
+          if (s3 !== peg$FAILED) {
+            s2 = input.substring(s2, peg$currPos);
+          } else {
+            s2 = s3;
+          }
+          if (s2 !== peg$FAILED) {
+            peg$savedPos = s0;
+            s1 = peg$c115(s2);
+            s0 = s1;
+          } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s0;
+          s0 = peg$FAILED;
+        }
+      }
+    }
+
+    return s0;
+  }
+
+  function peg$parseHexCodeChar() {
+    var s0;
+
+    if (peg$c116.test(input.charAt(peg$currPos))) {
+      s0 = input.charAt(peg$currPos);
+      peg$currPos++;
+    } else {
+      s0 = peg$FAILED;
+      if (peg$silentFails === 0) { peg$fail(peg$c117); }
+    }
 
     return s0;
   }
@@ -15155,11 +16410,11 @@ function peg$parse(input, options) {
     s1 = [];
     s2 = peg$currPos;
     if (input.charCodeAt(peg$currPos) === 92) {
-      s3 = peg$c65;
+      s3 = peg$c69;
       peg$currPos++;
     } else {
       s3 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c66); }
+      if (peg$silentFails === 0) { peg$fail(peg$c70); }
     }
     if (s3 !== peg$FAILED) {
       if (input.length > peg$currPos) {
@@ -15167,11 +16422,11 @@ function peg$parse(input, options) {
         peg$currPos++;
       } else {
         s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c67); }
+        if (peg$silentFails === 0) { peg$fail(peg$c118); }
       }
       if (s4 !== peg$FAILED) {
         peg$savedPos = s2;
-        s3 = peg$c68(s4);
+        s3 = peg$c73(s4);
         s2 = s3;
       } else {
         peg$currPos = s2;
@@ -15199,11 +16454,11 @@ function peg$parse(input, options) {
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c67); }
+          if (peg$silentFails === 0) { peg$fail(peg$c118); }
         }
         if (s4 !== peg$FAILED) {
           peg$savedPos = s2;
-          s3 = peg$c68(s4);
+          s3 = peg$c73(s4);
           s2 = s3;
         } else {
           peg$currPos = s2;
@@ -15219,11 +16474,11 @@ function peg$parse(input, options) {
         s1.push(s2);
         s2 = peg$currPos;
         if (input.charCodeAt(peg$currPos) === 92) {
-          s3 = peg$c65;
+          s3 = peg$c69;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c66); }
+          if (peg$silentFails === 0) { peg$fail(peg$c70); }
         }
         if (s3 !== peg$FAILED) {
           if (input.length > peg$currPos) {
@@ -15231,11 +16486,11 @@ function peg$parse(input, options) {
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c67); }
+            if (peg$silentFails === 0) { peg$fail(peg$c118); }
           }
           if (s4 !== peg$FAILED) {
             peg$savedPos = s2;
-            s3 = peg$c68(s4);
+            s3 = peg$c73(s4);
             s2 = s3;
           } else {
             peg$currPos = s2;
@@ -15263,11 +16518,11 @@ function peg$parse(input, options) {
               peg$currPos++;
             } else {
               s4 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c67); }
+              if (peg$silentFails === 0) { peg$fail(peg$c118); }
             }
             if (s4 !== peg$FAILED) {
               peg$savedPos = s2;
-              s3 = peg$c68(s4);
+              s3 = peg$c73(s4);
               s2 = s3;
             } else {
               peg$currPos = s2;
@@ -15284,7 +16539,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c71(s1);
+      s1 = peg$c76(s1);
     }
     s0 = s1;
 
@@ -15296,19 +16551,19 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     if (input.charCodeAt(peg$currPos) === 45) {
-      s1 = peg$c74;
+      s1 = peg$c119;
       peg$currPos++;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c75); }
+      if (peg$silentFails === 0) { peg$fail(peg$c120); }
     }
     if (s1 === peg$FAILED) {
       if (input.charCodeAt(peg$currPos) === 43) {
-        s1 = peg$c76;
+        s1 = peg$c121;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c77); }
+        if (peg$silentFails === 0) { peg$fail(peg$c122); }
       }
     }
     if (s1 === peg$FAILED) {
@@ -15316,22 +16571,22 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       s2 = [];
-      if (peg$c78.test(input.charAt(peg$currPos))) {
+      if (peg$c38.test(input.charAt(peg$currPos))) {
         s3 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s3 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c79); }
+        if (peg$silentFails === 0) { peg$fail(peg$c39); }
       }
       if (s3 !== peg$FAILED) {
         while (s3 !== peg$FAILED) {
           s2.push(s3);
-          if (peg$c78.test(input.charAt(peg$currPos))) {
+          if (peg$c38.test(input.charAt(peg$currPos))) {
             s3 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c79); }
+            if (peg$silentFails === 0) { peg$fail(peg$c39); }
           }
         }
       } else {
@@ -15339,30 +16594,30 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 46) {
-          s3 = peg$c80;
+          s3 = peg$c123;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c81); }
+          if (peg$silentFails === 0) { peg$fail(peg$c124); }
         }
         if (s3 !== peg$FAILED) {
           s4 = [];
-          if (peg$c78.test(input.charAt(peg$currPos))) {
+          if (peg$c38.test(input.charAt(peg$currPos))) {
             s5 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s5 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c79); }
+            if (peg$silentFails === 0) { peg$fail(peg$c39); }
           }
           if (s5 !== peg$FAILED) {
             while (s5 !== peg$FAILED) {
               s4.push(s5);
-              if (peg$c78.test(input.charAt(peg$currPos))) {
+              if (peg$c38.test(input.charAt(peg$currPos))) {
                 s5 = input.charAt(peg$currPos);
                 peg$currPos++;
               } else {
                 s5 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c79); }
+                if (peg$silentFails === 0) { peg$fail(peg$c39); }
               }
             }
           } else {
@@ -15370,7 +16625,7 @@ function peg$parse(input, options) {
           }
           if (s4 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c82(s1, s2, s4);
+            s1 = peg$c125(s1, s2, s4);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -15391,19 +16646,19 @@ function peg$parse(input, options) {
     if (s0 === peg$FAILED) {
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 45) {
-        s1 = peg$c74;
+        s1 = peg$c119;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c75); }
+        if (peg$silentFails === 0) { peg$fail(peg$c120); }
       }
       if (s1 === peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 43) {
-          s1 = peg$c76;
+          s1 = peg$c121;
           peg$currPos++;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c77); }
+          if (peg$silentFails === 0) { peg$fail(peg$c122); }
         }
       }
       if (s1 === peg$FAILED) {
@@ -15411,22 +16666,22 @@ function peg$parse(input, options) {
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c78.test(input.charAt(peg$currPos))) {
+        if (peg$c38.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c79); }
+          if (peg$silentFails === 0) { peg$fail(peg$c39); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c78.test(input.charAt(peg$currPos))) {
+            if (peg$c38.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c79); }
+              if (peg$silentFails === 0) { peg$fail(peg$c39); }
             }
           }
         } else {
@@ -15434,7 +16689,7 @@ function peg$parse(input, options) {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c83(s1, s2);
+          s1 = peg$c126(s1, s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -15449,7 +16704,7 @@ function peg$parse(input, options) {
         s1 = peg$parseVariable();
         if (s1 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c84(s1);
+          s1 = peg$c127(s1);
         }
         s0 = s1;
         if (s0 === peg$FAILED) {
@@ -15457,17 +16712,17 @@ function peg$parse(input, options) {
           s1 = peg$parseIdentifier();
           if (s1 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c85(s1);
+            s1 = peg$c128(s1);
           }
           s0 = s1;
           if (s0 === peg$FAILED) {
             s0 = peg$currPos;
             if (input.charCodeAt(peg$currPos) === 40) {
-              s1 = peg$c22;
+              s1 = peg$c24;
               peg$currPos++;
             } else {
               s1 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c23); }
+              if (peg$silentFails === 0) { peg$fail(peg$c25); }
             }
             if (s1 !== peg$FAILED) {
               s2 = [];
@@ -15487,15 +16742,15 @@ function peg$parse(input, options) {
                   }
                   if (s4 !== peg$FAILED) {
                     if (input.charCodeAt(peg$currPos) === 41) {
-                      s5 = peg$c24;
+                      s5 = peg$c26;
                       peg$currPos++;
                     } else {
                       s5 = peg$FAILED;
-                      if (peg$silentFails === 0) { peg$fail(peg$c25); }
+                      if (peg$silentFails === 0) { peg$fail(peg$c27); }
                     }
                     if (s5 !== peg$FAILED) {
                       peg$savedPos = s0;
-                      s1 = peg$c86(s3);
+                      s1 = peg$c129(s3);
                       s0 = s1;
                     } else {
                       peg$currPos = s0;
@@ -15526,50 +16781,125 @@ function peg$parse(input, options) {
   }
 
   function peg$parseArithmeticTimesExpression() {
-    var s0, s1, s2, s3, s4, s5;
+    var s0, s1, s2, s3, s4, s5, s6, s7;
 
     s0 = peg$currPos;
     s1 = peg$parseArithmeticPrimary();
     if (s1 !== peg$FAILED) {
       s2 = [];
-      s3 = peg$parseS();
-      while (s3 !== peg$FAILED) {
-        s2.push(s3);
-        s3 = peg$parseS();
+      s3 = peg$currPos;
+      s4 = [];
+      s5 = peg$parseS();
+      while (s5 !== peg$FAILED) {
+        s4.push(s5);
+        s5 = peg$parseS();
       }
-      if (s2 !== peg$FAILED) {
+      if (s4 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 42) {
-          s3 = peg$c87;
+          s5 = peg$c130;
           peg$currPos++;
         } else {
-          s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c88); }
+          s5 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c131); }
         }
-        if (s3 !== peg$FAILED) {
-          s4 = [];
-          s5 = peg$parseS();
-          while (s5 !== peg$FAILED) {
-            s4.push(s5);
-            s5 = peg$parseS();
+        if (s5 === peg$FAILED) {
+          if (input.charCodeAt(peg$currPos) === 47) {
+            s5 = peg$c132;
+            peg$currPos++;
+          } else {
+            s5 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c133); }
           }
-          if (s4 !== peg$FAILED) {
-            s5 = peg$parseArithmeticTimesExpression();
-            if (s5 !== peg$FAILED) {
-              peg$savedPos = s0;
-              s1 = peg$c89(s1, s5);
-              s0 = s1;
+        }
+        if (s5 !== peg$FAILED) {
+          s6 = [];
+          s7 = peg$parseS();
+          while (s7 !== peg$FAILED) {
+            s6.push(s7);
+            s7 = peg$parseS();
+          }
+          if (s6 !== peg$FAILED) {
+            s7 = peg$parseArithmeticPrimary();
+            if (s7 !== peg$FAILED) {
+              peg$savedPos = s3;
+              s4 = peg$c134(s1, s5, s7);
+              s3 = s4;
             } else {
-              peg$currPos = s0;
-              s0 = peg$FAILED;
+              peg$currPos = s3;
+              s3 = peg$FAILED;
             }
           } else {
-            peg$currPos = s0;
-            s0 = peg$FAILED;
+            peg$currPos = s3;
+            s3 = peg$FAILED;
           }
         } else {
-          peg$currPos = s0;
-          s0 = peg$FAILED;
+          peg$currPos = s3;
+          s3 = peg$FAILED;
         }
+      } else {
+        peg$currPos = s3;
+        s3 = peg$FAILED;
+      }
+      while (s3 !== peg$FAILED) {
+        s2.push(s3);
+        s3 = peg$currPos;
+        s4 = [];
+        s5 = peg$parseS();
+        while (s5 !== peg$FAILED) {
+          s4.push(s5);
+          s5 = peg$parseS();
+        }
+        if (s4 !== peg$FAILED) {
+          if (input.charCodeAt(peg$currPos) === 42) {
+            s5 = peg$c130;
+            peg$currPos++;
+          } else {
+            s5 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c131); }
+          }
+          if (s5 === peg$FAILED) {
+            if (input.charCodeAt(peg$currPos) === 47) {
+              s5 = peg$c132;
+              peg$currPos++;
+            } else {
+              s5 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c133); }
+            }
+          }
+          if (s5 !== peg$FAILED) {
+            s6 = [];
+            s7 = peg$parseS();
+            while (s7 !== peg$FAILED) {
+              s6.push(s7);
+              s7 = peg$parseS();
+            }
+            if (s6 !== peg$FAILED) {
+              s7 = peg$parseArithmeticPrimary();
+              if (s7 !== peg$FAILED) {
+                peg$savedPos = s3;
+                s4 = peg$c134(s1, s5, s7);
+                s3 = s4;
+              } else {
+                peg$currPos = s3;
+                s3 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s3;
+              s3 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s3;
+            s3 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s3;
+          s3 = peg$FAILED;
+        }
+      }
+      if (s2 !== peg$FAILED) {
+        peg$savedPos = s0;
+        s1 = peg$c135(s1, s2);
+        s0 = s1;
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -15577,111 +16907,131 @@ function peg$parse(input, options) {
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
-    }
-    if (s0 === peg$FAILED) {
-      s0 = peg$currPos;
-      s1 = peg$parseArithmeticPrimary();
-      if (s1 !== peg$FAILED) {
-        s2 = [];
-        s3 = peg$parseS();
-        while (s3 !== peg$FAILED) {
-          s2.push(s3);
-          s3 = peg$parseS();
-        }
-        if (s2 !== peg$FAILED) {
-          if (input.charCodeAt(peg$currPos) === 47) {
-            s3 = peg$c90;
-            peg$currPos++;
-          } else {
-            s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c91); }
-          }
-          if (s3 !== peg$FAILED) {
-            s4 = [];
-            s5 = peg$parseS();
-            while (s5 !== peg$FAILED) {
-              s4.push(s5);
-              s5 = peg$parseS();
-            }
-            if (s4 !== peg$FAILED) {
-              s5 = peg$parseArithmeticTimesExpression();
-              if (s5 !== peg$FAILED) {
-                peg$savedPos = s0;
-                s1 = peg$c92(s1, s5);
-                s0 = s1;
-              } else {
-                peg$currPos = s0;
-                s0 = peg$FAILED;
-              }
-            } else {
-              peg$currPos = s0;
-              s0 = peg$FAILED;
-            }
-          } else {
-            peg$currPos = s0;
-            s0 = peg$FAILED;
-          }
-        } else {
-          peg$currPos = s0;
-          s0 = peg$FAILED;
-        }
-      } else {
-        peg$currPos = s0;
-        s0 = peg$FAILED;
-      }
-      if (s0 === peg$FAILED) {
-        s0 = peg$parseArithmeticPrimary();
-      }
     }
 
     return s0;
   }
 
   function peg$parseArithmeticExpression() {
-    var s0, s1, s2, s3, s4, s5;
+    var s0, s1, s2, s3, s4, s5, s6, s7;
 
     s0 = peg$currPos;
     s1 = peg$parseArithmeticTimesExpression();
     if (s1 !== peg$FAILED) {
       s2 = [];
-      s3 = peg$parseS();
-      while (s3 !== peg$FAILED) {
-        s2.push(s3);
-        s3 = peg$parseS();
+      s3 = peg$currPos;
+      s4 = [];
+      s5 = peg$parseS();
+      while (s5 !== peg$FAILED) {
+        s4.push(s5);
+        s5 = peg$parseS();
       }
-      if (s2 !== peg$FAILED) {
+      if (s4 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 43) {
-          s3 = peg$c76;
+          s5 = peg$c121;
           peg$currPos++;
         } else {
-          s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c77); }
+          s5 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c122); }
         }
-        if (s3 !== peg$FAILED) {
-          s4 = [];
-          s5 = peg$parseS();
-          while (s5 !== peg$FAILED) {
-            s4.push(s5);
-            s5 = peg$parseS();
+        if (s5 === peg$FAILED) {
+          if (input.charCodeAt(peg$currPos) === 45) {
+            s5 = peg$c119;
+            peg$currPos++;
+          } else {
+            s5 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c120); }
           }
-          if (s4 !== peg$FAILED) {
-            s5 = peg$parseArithmeticExpression();
-            if (s5 !== peg$FAILED) {
-              peg$savedPos = s0;
-              s1 = peg$c93(s1, s5);
-              s0 = s1;
+        }
+        if (s5 !== peg$FAILED) {
+          s6 = [];
+          s7 = peg$parseS();
+          while (s7 !== peg$FAILED) {
+            s6.push(s7);
+            s7 = peg$parseS();
+          }
+          if (s6 !== peg$FAILED) {
+            s7 = peg$parseArithmeticTimesExpression();
+            if (s7 !== peg$FAILED) {
+              peg$savedPos = s3;
+              s4 = peg$c136(s1, s5, s7);
+              s3 = s4;
             } else {
-              peg$currPos = s0;
-              s0 = peg$FAILED;
+              peg$currPos = s3;
+              s3 = peg$FAILED;
             }
           } else {
-            peg$currPos = s0;
-            s0 = peg$FAILED;
+            peg$currPos = s3;
+            s3 = peg$FAILED;
           }
         } else {
-          peg$currPos = s0;
-          s0 = peg$FAILED;
+          peg$currPos = s3;
+          s3 = peg$FAILED;
         }
+      } else {
+        peg$currPos = s3;
+        s3 = peg$FAILED;
+      }
+      while (s3 !== peg$FAILED) {
+        s2.push(s3);
+        s3 = peg$currPos;
+        s4 = [];
+        s5 = peg$parseS();
+        while (s5 !== peg$FAILED) {
+          s4.push(s5);
+          s5 = peg$parseS();
+        }
+        if (s4 !== peg$FAILED) {
+          if (input.charCodeAt(peg$currPos) === 43) {
+            s5 = peg$c121;
+            peg$currPos++;
+          } else {
+            s5 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c122); }
+          }
+          if (s5 === peg$FAILED) {
+            if (input.charCodeAt(peg$currPos) === 45) {
+              s5 = peg$c119;
+              peg$currPos++;
+            } else {
+              s5 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c120); }
+            }
+          }
+          if (s5 !== peg$FAILED) {
+            s6 = [];
+            s7 = peg$parseS();
+            while (s7 !== peg$FAILED) {
+              s6.push(s7);
+              s7 = peg$parseS();
+            }
+            if (s6 !== peg$FAILED) {
+              s7 = peg$parseArithmeticTimesExpression();
+              if (s7 !== peg$FAILED) {
+                peg$savedPos = s3;
+                s4 = peg$c136(s1, s5, s7);
+                s3 = s4;
+              } else {
+                peg$currPos = s3;
+                s3 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s3;
+              s3 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s3;
+            s3 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s3;
+          s3 = peg$FAILED;
+        }
+      }
+      if (s2 !== peg$FAILED) {
+        peg$savedPos = s0;
+        s1 = peg$c135(s1, s2);
+        s0 = s1;
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -15689,61 +17039,6 @@ function peg$parse(input, options) {
     } else {
       peg$currPos = s0;
       s0 = peg$FAILED;
-    }
-    if (s0 === peg$FAILED) {
-      s0 = peg$currPos;
-      s1 = peg$parseArithmeticTimesExpression();
-      if (s1 !== peg$FAILED) {
-        s2 = [];
-        s3 = peg$parseS();
-        while (s3 !== peg$FAILED) {
-          s2.push(s3);
-          s3 = peg$parseS();
-        }
-        if (s2 !== peg$FAILED) {
-          if (input.charCodeAt(peg$currPos) === 45) {
-            s3 = peg$c74;
-            peg$currPos++;
-          } else {
-            s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c75); }
-          }
-          if (s3 !== peg$FAILED) {
-            s4 = [];
-            s5 = peg$parseS();
-            while (s5 !== peg$FAILED) {
-              s4.push(s5);
-              s5 = peg$parseS();
-            }
-            if (s4 !== peg$FAILED) {
-              s5 = peg$parseArithmeticExpression();
-              if (s5 !== peg$FAILED) {
-                peg$savedPos = s0;
-                s1 = peg$c94(s1, s5);
-                s0 = s1;
-              } else {
-                peg$currPos = s0;
-                s0 = peg$FAILED;
-              }
-            } else {
-              peg$currPos = s0;
-              s0 = peg$FAILED;
-            }
-          } else {
-            peg$currPos = s0;
-            s0 = peg$FAILED;
-          }
-        } else {
-          peg$currPos = s0;
-          s0 = peg$FAILED;
-        }
-      } else {
-        peg$currPos = s0;
-        s0 = peg$FAILED;
-      }
-      if (s0 === peg$FAILED) {
-        s0 = peg$parseArithmeticTimesExpression();
-      }
     }
 
     return s0;
@@ -15753,12 +17048,12 @@ function peg$parse(input, options) {
     var s0, s1, s2, s3, s4, s5;
 
     s0 = peg$currPos;
-    if (input.substr(peg$currPos, 3) === peg$c95) {
-      s1 = peg$c95;
+    if (input.substr(peg$currPos, 3) === peg$c137) {
+      s1 = peg$c137;
       peg$currPos += 3;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c96); }
+      if (peg$silentFails === 0) { peg$fail(peg$c138); }
     }
     if (s1 !== peg$FAILED) {
       s2 = [];
@@ -15777,16 +17072,16 @@ function peg$parse(input, options) {
             s5 = peg$parseS();
           }
           if (s4 !== peg$FAILED) {
-            if (input.substr(peg$currPos, 2) === peg$c97) {
-              s5 = peg$c97;
+            if (input.substr(peg$currPos, 2) === peg$c139) {
+              s5 = peg$c139;
               peg$currPos += 2;
             } else {
               s5 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c98); }
+              if (peg$silentFails === 0) { peg$fail(peg$c140); }
             }
             if (s5 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c99(s3);
+              s1 = peg$c141(s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -15816,26 +17111,26 @@ function peg$parse(input, options) {
     var s0, s1, s2, s3;
 
     s0 = peg$currPos;
-    if (input.substr(peg$currPos, 2) === peg$c100) {
-      s1 = peg$c100;
+    if (input.substr(peg$currPos, 2) === peg$c142) {
+      s1 = peg$c142;
       peg$currPos += 2;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c101); }
+      if (peg$silentFails === 0) { peg$fail(peg$c143); }
     }
     if (s1 !== peg$FAILED) {
       s2 = peg$parseShellLine();
       if (s2 !== peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 41) {
-          s3 = peg$c24;
+          s3 = peg$c26;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c25); }
+          if (peg$silentFails === 0) { peg$fail(peg$c27); }
         }
         if (s3 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c102(s2);
+          s1 = peg$c144(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -15857,36 +17152,36 @@ function peg$parse(input, options) {
     var s0, s1, s2, s3, s4, s5;
 
     s0 = peg$currPos;
-    if (input.substr(peg$currPos, 2) === peg$c103) {
-      s1 = peg$c103;
+    if (input.substr(peg$currPos, 2) === peg$c145) {
+      s1 = peg$c145;
       peg$currPos += 2;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c104); }
+      if (peg$silentFails === 0) { peg$fail(peg$c146); }
     }
     if (s1 !== peg$FAILED) {
       s2 = peg$parseIdentifier();
       if (s2 !== peg$FAILED) {
-        if (input.substr(peg$currPos, 2) === peg$c105) {
-          s3 = peg$c105;
+        if (input.substr(peg$currPos, 2) === peg$c147) {
+          s3 = peg$c147;
           peg$currPos += 2;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c106); }
+          if (peg$silentFails === 0) { peg$fail(peg$c148); }
         }
         if (s3 !== peg$FAILED) {
           s4 = peg$parseCommandString();
           if (s4 !== peg$FAILED) {
             if (input.charCodeAt(peg$currPos) === 125) {
-              s5 = peg$c29;
+              s5 = peg$c31;
               peg$currPos++;
             } else {
               s5 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c30); }
+              if (peg$silentFails === 0) { peg$fail(peg$c32); }
             }
             if (s5 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c107(s2, s4);
+              s1 = peg$c149(s2, s4);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -15910,26 +17205,26 @@ function peg$parse(input, options) {
     }
     if (s0 === peg$FAILED) {
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 2) === peg$c103) {
-        s1 = peg$c103;
+      if (input.substr(peg$currPos, 2) === peg$c145) {
+        s1 = peg$c145;
         peg$currPos += 2;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c104); }
+        if (peg$silentFails === 0) { peg$fail(peg$c146); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parseIdentifier();
         if (s2 !== peg$FAILED) {
-          if (input.substr(peg$currPos, 3) === peg$c108) {
-            s3 = peg$c108;
+          if (input.substr(peg$currPos, 3) === peg$c150) {
+            s3 = peg$c150;
             peg$currPos += 3;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c109); }
+            if (peg$silentFails === 0) { peg$fail(peg$c151); }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c110(s2);
+            s1 = peg$c152(s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -15945,26 +17240,26 @@ function peg$parse(input, options) {
       }
       if (s0 === peg$FAILED) {
         s0 = peg$currPos;
-        if (input.substr(peg$currPos, 2) === peg$c103) {
-          s1 = peg$c103;
+        if (input.substr(peg$currPos, 2) === peg$c145) {
+          s1 = peg$c145;
           peg$currPos += 2;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c104); }
+          if (peg$silentFails === 0) { peg$fail(peg$c146); }
         }
         if (s1 !== peg$FAILED) {
           s2 = peg$parseIdentifier();
           if (s2 !== peg$FAILED) {
             if (input.charCodeAt(peg$currPos) === 125) {
-              s3 = peg$c29;
+              s3 = peg$c31;
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c30); }
+              if (peg$silentFails === 0) { peg$fail(peg$c32); }
             }
             if (s3 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c111(s2);
+              s1 = peg$c153(s2);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -15981,17 +17276,17 @@ function peg$parse(input, options) {
         if (s0 === peg$FAILED) {
           s0 = peg$currPos;
           if (input.charCodeAt(peg$currPos) === 36) {
-            s1 = peg$c112;
+            s1 = peg$c154;
             peg$currPos++;
           } else {
             s1 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c113); }
+            if (peg$silentFails === 0) { peg$fail(peg$c155); }
           }
           if (s1 !== peg$FAILED) {
             s2 = peg$parseIdentifier();
             if (s2 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c111(s2);
+              s1 = peg$c153(s2);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -16015,7 +17310,7 @@ function peg$parse(input, options) {
     s1 = peg$parseGlobText();
     if (s1 !== peg$FAILED) {
       peg$savedPos = peg$currPos;
-      s2 = peg$c114(s1);
+      s2 = peg$c156(s1);
       if (s2) {
         s2 = void 0;
       } else {
@@ -16023,7 +17318,7 @@ function peg$parse(input, options) {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c115(s1);
+        s1 = peg$c157(s1);
         s0 = s1;
       } else {
         peg$currPos = s0;
@@ -16059,11 +17354,11 @@ function peg$parse(input, options) {
         peg$currPos++;
       } else {
         s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c67); }
+        if (peg$silentFails === 0) { peg$fail(peg$c118); }
       }
       if (s4 !== peg$FAILED) {
         peg$savedPos = s2;
-        s3 = peg$c68(s4);
+        s3 = peg$c73(s4);
         s2 = s3;
       } else {
         peg$currPos = s2;
@@ -16093,11 +17388,11 @@ function peg$parse(input, options) {
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c67); }
+            if (peg$silentFails === 0) { peg$fail(peg$c118); }
           }
           if (s4 !== peg$FAILED) {
             peg$savedPos = s2;
-            s3 = peg$c68(s4);
+            s3 = peg$c73(s4);
             s2 = s3;
           } else {
             peg$currPos = s2;
@@ -16113,7 +17408,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c71(s1);
+      s1 = peg$c76(s1);
     }
     s0 = s1;
 
@@ -16125,22 +17420,22 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     s1 = [];
-    if (peg$c116.test(input.charAt(peg$currPos))) {
+    if (peg$c158.test(input.charAt(peg$currPos))) {
       s2 = input.charAt(peg$currPos);
       peg$currPos++;
     } else {
       s2 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c117); }
+      if (peg$silentFails === 0) { peg$fail(peg$c159); }
     }
     if (s2 !== peg$FAILED) {
       while (s2 !== peg$FAILED) {
         s1.push(s2);
-        if (peg$c116.test(input.charAt(peg$currPos))) {
+        if (peg$c158.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c117); }
+          if (peg$silentFails === 0) { peg$fail(peg$c159); }
         }
       }
     } else {
@@ -16148,7 +17443,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c118();
+      s1 = peg$c160();
     }
     s0 = s1;
 
@@ -16160,22 +17455,22 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     s1 = [];
-    if (peg$c119.test(input.charAt(peg$currPos))) {
+    if (peg$c161.test(input.charAt(peg$currPos))) {
       s2 = input.charAt(peg$currPos);
       peg$currPos++;
     } else {
       s2 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c120); }
+      if (peg$silentFails === 0) { peg$fail(peg$c162); }
     }
     if (s2 !== peg$FAILED) {
       while (s2 !== peg$FAILED) {
         s1.push(s2);
-        if (peg$c119.test(input.charAt(peg$currPos))) {
+        if (peg$c161.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c120); }
+          if (peg$silentFails === 0) { peg$fail(peg$c162); }
         }
       }
     } else {
@@ -16183,7 +17478,7 @@ function peg$parse(input, options) {
     }
     if (s1 !== peg$FAILED) {
       peg$savedPos = s0;
-      s1 = peg$c118();
+      s1 = peg$c160();
     }
     s0 = s1;
 
@@ -16193,12 +17488,12 @@ function peg$parse(input, options) {
   function peg$parseSpecialShellChars() {
     var s0;
 
-    if (peg$c121.test(input.charAt(peg$currPos))) {
+    if (peg$c163.test(input.charAt(peg$currPos))) {
       s0 = input.charAt(peg$currPos);
       peg$currPos++;
     } else {
       s0 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c122); }
+      if (peg$silentFails === 0) { peg$fail(peg$c164); }
     }
 
     return s0;
@@ -16207,12 +17502,12 @@ function peg$parse(input, options) {
   function peg$parseGlobSpecialShellChars() {
     var s0;
 
-    if (peg$c123.test(input.charAt(peg$currPos))) {
+    if (peg$c165.test(input.charAt(peg$currPos))) {
       s0 = input.charAt(peg$currPos);
       peg$currPos++;
     } else {
       s0 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c124); }
+      if (peg$silentFails === 0) { peg$fail(peg$c166); }
     }
 
     return s0;
@@ -16222,22 +17517,22 @@ function peg$parse(input, options) {
     var s0, s1;
 
     s0 = [];
-    if (peg$c125.test(input.charAt(peg$currPos))) {
+    if (peg$c167.test(input.charAt(peg$currPos))) {
       s1 = input.charAt(peg$currPos);
       peg$currPos++;
     } else {
       s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$c126); }
+      if (peg$silentFails === 0) { peg$fail(peg$c168); }
     }
     if (s1 !== peg$FAILED) {
       while (s1 !== peg$FAILED) {
         s0.push(s1);
-        if (peg$c125.test(input.charAt(peg$currPos))) {
+        if (peg$c167.test(input.charAt(peg$currPos))) {
           s1 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c126); }
+          if (peg$silentFails === 0) { peg$fail(peg$c168); }
         }
       }
     } else {
@@ -16308,35 +17603,35 @@ peg$subclass(peg$SyntaxError, Error);
 
 peg$SyntaxError.buildMessage = function(expected, found) {
   var DESCRIBE_EXPECTATION_FNS = {
-    literal: function(expectation) {
-      return `"${literalEscape(expectation.text)}"`;
-    },
+        literal: function(expectation) {
+          return "\"" + literalEscape(expectation.text) + "\"";
+        },
 
-    "class": function(expectation) {
-      var escapedParts = "",
-        i;
+        "class": function(expectation) {
+          var escapedParts = "",
+              i;
 
-      for (i = 0; i < expectation.parts.length; i++)
-        escapedParts += expectation.parts[i] instanceof Array
-          ? `${classEscape(expectation.parts[i][0])}-${classEscape(expectation.parts[i][1])}`
-          : classEscape(expectation.parts[i]);
+          for (i = 0; i < expectation.parts.length; i++) {
+            escapedParts += expectation.parts[i] instanceof Array
+              ? classEscape(expectation.parts[i][0]) + "-" + classEscape(expectation.parts[i][1])
+              : classEscape(expectation.parts[i]);
+          }
 
+          return "[" + (expectation.inverted ? "^" : "") + escapedParts + "]";
+        },
 
-      return `[${expectation.inverted ? "^" : ""}${escapedParts}]`;
-    },
+        any: function(expectation) {
+          return "any character";
+        },
 
-    any: function(expectation) {
-      return "any character";
-    },
+        end: function(expectation) {
+          return "end of input";
+        },
 
-    end: function(expectation) {
-      return "end of input";
-    },
-
-    other: function(expectation) {
-      return expectation.description;
-    },
-  };
+        other: function(expectation) {
+          return expectation.description;
+        }
+      };
 
   function hex(ch) {
     return ch.charCodeAt(0).toString(16).toUpperCase();
@@ -16350,8 +17645,8 @@ peg$SyntaxError.buildMessage = function(expected, found) {
       .replace(/\t/g, '\\t')
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
-      .replace(/[\x00-\x0F]/g,          function(ch) { return `\\x0${hex(ch)}`; })
-      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return `\\x${hex(ch)}`; });
+      .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
   }
 
   function classEscape(s) {
@@ -16364,8 +17659,8 @@ peg$SyntaxError.buildMessage = function(expected, found) {
       .replace(/\t/g, '\\t')
       .replace(/\n/g, '\\n')
       .replace(/\r/g, '\\r')
-      .replace(/[\x00-\x0F]/g,          function(ch) { return `\\x0${hex(ch)}`; })
-      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return `\\x${hex(ch)}`; });
+      .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
   }
 
   function describeExpectation(expectation) {
@@ -16374,11 +17669,11 @@ peg$SyntaxError.buildMessage = function(expected, found) {
 
   function describeExpected(expected) {
     var descriptions = new Array(expected.length),
-      i, j;
+        i, j;
 
-    for (i = 0; i < expected.length; i++)
+    for (i = 0; i < expected.length; i++) {
       descriptions[i] = describeExpectation(expected[i]);
-
+    }
 
     descriptions.sort();
 
@@ -16397,20 +17692,20 @@ peg$SyntaxError.buildMessage = function(expected, found) {
         return descriptions[0];
 
       case 2:
-        return `${descriptions[0]} or ${descriptions[1]}`;
+        return descriptions[0] + " or " + descriptions[1];
 
       default:
-        return `${descriptions.slice(0, -1).join(", ")
-        }, or ${
-          descriptions[descriptions.length - 1]}`;
+        return descriptions.slice(0, -1).join(", ")
+          + ", or "
+          + descriptions[descriptions.length - 1];
     }
   }
 
   function describeFound(found) {
-    return found ? `"${literalEscape(found)}"` : "end of input";
+    return found ? "\"" + literalEscape(found) + "\"" : "end of input";
   }
 
-  return `Expected ${describeExpected(expected)} but ${describeFound(found)} found.`;
+  return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
 };
 
 function peg$parse(input, options) {
@@ -16418,121 +17713,121 @@ function peg$parse(input, options) {
 
   var peg$FAILED = {},
 
-    peg$startRuleFunctions = {Start: peg$parseStart},
-    peg$startRuleFunction  = peg$parseStart,
+      peg$startRuleFunctions = { Start: peg$parseStart },
+      peg$startRuleFunction  = peg$parseStart,
 
-    peg$c0 = function(statements) { return [].concat(...statements); },
-    peg$c1 = "-",
-    peg$c2 = peg$literalExpectation("-", false),
-    peg$c3 = function(value) { return value; },
-    peg$c4 = function(statements) { return Object.assign({}, ...statements); },
-    peg$c5 = "#",
-    peg$c6 = peg$literalExpectation("#", false),
-    peg$c7 = peg$anyExpectation(),
-    peg$c8 = function() { return {}; },
-    peg$c9 = ":",
-    peg$c10 = peg$literalExpectation(":", false),
-    peg$c11 = function(property, value) { return {[property]: value}; },
-    peg$c12 = ",",
-    peg$c13 = peg$literalExpectation(",", false),
-    peg$c14 = function(property, other) { return other; },
-    peg$c15 = function(property, others, value) { return Object.assign({}, ...[property].concat(others).map(property => ({[property]: value}))); },
-    peg$c16 = function(statements) { return statements; },
-    peg$c17 = function(expression) { return expression; },
-    peg$c18 = peg$otherExpectation("correct indentation"),
-    peg$c19 = " ",
-    peg$c20 = peg$literalExpectation(" ", false),
-    peg$c21 = function(spaces) { return spaces.length === indentLevel * INDENT_STEP; },
-    peg$c22 = function(spaces) { return spaces.length === (indentLevel + 1) * INDENT_STEP; },
-    peg$c23 = function() { indentLevel++; return true; },
-    peg$c24 = function() { indentLevel--; return true; },
-    peg$c25 = function() { return text(); },
-    peg$c26 = peg$otherExpectation("pseudostring"),
-    peg$c27 = /^[^\r\n\t ?:,\][{}#&*!|>'"%@`\-]/,
-    peg$c28 = peg$classExpectation(["\r", "\n", "\t", " ", "?", ":", ",", "]", "[", "{", "}", "#", "&", "*", "!", "|", ">", "'", "\"", "%", "@", "`", "-"], true, false),
-    peg$c29 = /^[^\r\n\t ,\][{}:#"']/,
-    peg$c30 = peg$classExpectation(["\r", "\n", "\t", " ", ",", "]", "[", "{", "}", ":", "#", "\"", "'"], true, false),
-    peg$c31 = function() { return text().replace(/^ *| *$/g, ''); },
-    peg$c32 = "--",
-    peg$c33 = peg$literalExpectation("--", false),
-    peg$c34 = /^[a-zA-Z\/0-9]/,
-    peg$c35 = peg$classExpectation([["a", "z"], ["A", "Z"], "/", ["0", "9"]], false, false),
-    peg$c36 = /^[^\r\n\t :,]/,
-    peg$c37 = peg$classExpectation(["\r", "\n", "\t", " ", ":", ","], true, false),
-    peg$c38 = "null",
-    peg$c39 = peg$literalExpectation("null", false),
-    peg$c40 = function() { return null; },
-    peg$c41 = "true",
-    peg$c42 = peg$literalExpectation("true", false),
-    peg$c43 = function() { return true; },
-    peg$c44 = "false",
-    peg$c45 = peg$literalExpectation("false", false),
-    peg$c46 = function() { return false; },
-    peg$c47 = peg$otherExpectation("string"),
-    peg$c48 = "\"",
-    peg$c49 = peg$literalExpectation("\"", false),
-    peg$c50 = function() { return ""; },
-    peg$c51 = function(chars) { return chars; },
-    peg$c52 = function(chars) { return chars.join(``); },
-    peg$c53 = /^[^"\\\0-\x1F\x7F]/,
-    peg$c54 = peg$classExpectation(["\"", "\\", ["\0", "\x1F"], "\x7F"], true, false),
-    peg$c55 = "\\\"",
-    peg$c56 = peg$literalExpectation("\\\"", false),
-    peg$c57 = function() { return `"`; },
-    peg$c58 = "\\\\",
-    peg$c59 = peg$literalExpectation("\\\\", false),
-    peg$c60 = function() { return `\\`; },
-    peg$c61 = "\\/",
-    peg$c62 = peg$literalExpectation("\\/", false),
-    peg$c63 = function() { return `/`;  },
-    peg$c64 = "\\b",
-    peg$c65 = peg$literalExpectation("\\b", false),
-    peg$c66 = function() { return `\b`; },
-    peg$c67 = "\\f",
-    peg$c68 = peg$literalExpectation("\\f", false),
-    peg$c69 = function() { return `\f`; },
-    peg$c70 = "\\n",
-    peg$c71 = peg$literalExpectation("\\n", false),
-    peg$c72 = function() { return `\n`; },
-    peg$c73 = "\\r",
-    peg$c74 = peg$literalExpectation("\\r", false),
-    peg$c75 = function() { return `\r`; },
-    peg$c76 = "\\t",
-    peg$c77 = peg$literalExpectation("\\t", false),
-    peg$c78 = function() { return `\t`; },
-    peg$c79 = "\\u",
-    peg$c80 = peg$literalExpectation("\\u", false),
-    peg$c81 = function(h1, h2, h3, h4) {
-      return String.fromCharCode(parseInt(`0x${h1}${h2}${h3}${h4}`));
-    },
-    peg$c82 = /^[0-9a-fA-F]/,
-    peg$c83 = peg$classExpectation([["0", "9"], ["a", "f"], ["A", "F"]], false, false),
-    peg$c84 = peg$otherExpectation("blank space"),
-    peg$c85 = /^[ \t]/,
-    peg$c86 = peg$classExpectation([" ", "\t"], false, false),
-    peg$c87 = peg$otherExpectation("white space"),
-    peg$c88 = /^[ \t\n\r]/,
-    peg$c89 = peg$classExpectation([" ", "\t", "\n", "\r"], false, false),
-    peg$c90 = "\r\n",
-    peg$c91 = peg$literalExpectation("\r\n", false),
-    peg$c92 = "\n",
-    peg$c93 = peg$literalExpectation("\n", false),
-    peg$c94 = "\r",
-    peg$c95 = peg$literalExpectation("\r", false),
+      peg$c0 = function(statements) { return [].concat(... statements) },
+      peg$c1 = "-",
+      peg$c2 = peg$literalExpectation("-", false),
+      peg$c3 = function(value) { return value },
+      peg$c4 = function(statements) { return Object.assign({}, ... statements) },
+      peg$c5 = "#",
+      peg$c6 = peg$literalExpectation("#", false),
+      peg$c7 = peg$anyExpectation(),
+      peg$c8 = function() { return {} },
+      peg$c9 = ":",
+      peg$c10 = peg$literalExpectation(":", false),
+      peg$c11 = function(property, value) { return {[property]: value} },
+      peg$c12 = ",",
+      peg$c13 = peg$literalExpectation(",", false),
+      peg$c14 = function(property, other) { return other },
+      peg$c15 = function(property, others, value) { return Object.assign({}, ... [property].concat(others).map(property => ({[property]: value}))) },
+      peg$c16 = function(statements) { return statements },
+      peg$c17 = function(expression) { return expression },
+      peg$c18 = peg$otherExpectation("correct indentation"),
+      peg$c19 = " ",
+      peg$c20 = peg$literalExpectation(" ", false),
+      peg$c21 = function(spaces) { return spaces.length === indentLevel * INDENT_STEP },
+      peg$c22 = function(spaces) { return spaces.length === (indentLevel + 1) * INDENT_STEP },
+      peg$c23 = function() { indentLevel++; return true },
+      peg$c24 = function() { indentLevel--; return true },
+      peg$c25 = function() { return text() },
+      peg$c26 = peg$otherExpectation("pseudostring"),
+      peg$c27 = /^[^\r\n\t ?:,\][{}#&*!|>'"%@`\-]/,
+      peg$c28 = peg$classExpectation(["\r", "\n", "\t", " ", "?", ":", ",", "]", "[", "{", "}", "#", "&", "*", "!", "|", ">", "'", "\"", "%", "@", "`", "-"], true, false),
+      peg$c29 = /^[^\r\n\t ,\][{}:#"']/,
+      peg$c30 = peg$classExpectation(["\r", "\n", "\t", " ", ",", "]", "[", "{", "}", ":", "#", "\"", "'"], true, false),
+      peg$c31 = function() { return text().replace(/^ *| *$/g, '') },
+      peg$c32 = "--",
+      peg$c33 = peg$literalExpectation("--", false),
+      peg$c34 = /^[a-zA-Z\/0-9]/,
+      peg$c35 = peg$classExpectation([["a", "z"], ["A", "Z"], "/", ["0", "9"]], false, false),
+      peg$c36 = /^[^\r\n\t :,]/,
+      peg$c37 = peg$classExpectation(["\r", "\n", "\t", " ", ":", ","], true, false),
+      peg$c38 = "null",
+      peg$c39 = peg$literalExpectation("null", false),
+      peg$c40 = function() { return null },
+      peg$c41 = "true",
+      peg$c42 = peg$literalExpectation("true", false),
+      peg$c43 = function() { return true },
+      peg$c44 = "false",
+      peg$c45 = peg$literalExpectation("false", false),
+      peg$c46 = function() { return false },
+      peg$c47 = peg$otherExpectation("string"),
+      peg$c48 = "\"",
+      peg$c49 = peg$literalExpectation("\"", false),
+      peg$c50 = function() { return "" },
+      peg$c51 = function(chars) { return chars },
+      peg$c52 = function(chars) { return chars.join(``) },
+      peg$c53 = /^[^"\\\0-\x1F\x7F]/,
+      peg$c54 = peg$classExpectation(["\"", "\\", ["\0", "\x1F"], "\x7F"], true, false),
+      peg$c55 = "\\\"",
+      peg$c56 = peg$literalExpectation("\\\"", false),
+      peg$c57 = function() { return `"` },
+      peg$c58 = "\\\\",
+      peg$c59 = peg$literalExpectation("\\\\", false),
+      peg$c60 = function() { return `\\` },
+      peg$c61 = "\\/",
+      peg$c62 = peg$literalExpectation("\\/", false),
+      peg$c63 = function() { return `/`  },
+      peg$c64 = "\\b",
+      peg$c65 = peg$literalExpectation("\\b", false),
+      peg$c66 = function() { return `\b` },
+      peg$c67 = "\\f",
+      peg$c68 = peg$literalExpectation("\\f", false),
+      peg$c69 = function() { return `\f` },
+      peg$c70 = "\\n",
+      peg$c71 = peg$literalExpectation("\\n", false),
+      peg$c72 = function() { return `\n` },
+      peg$c73 = "\\r",
+      peg$c74 = peg$literalExpectation("\\r", false),
+      peg$c75 = function() { return `\r` },
+      peg$c76 = "\\t",
+      peg$c77 = peg$literalExpectation("\\t", false),
+      peg$c78 = function() { return `\t` },
+      peg$c79 = "\\u",
+      peg$c80 = peg$literalExpectation("\\u", false),
+      peg$c81 = function(h1, h2, h3, h4) {
+            return String.fromCharCode(parseInt(`0x${h1}${h2}${h3}${h4}`));
+          },
+      peg$c82 = /^[0-9a-fA-F]/,
+      peg$c83 = peg$classExpectation([["0", "9"], ["a", "f"], ["A", "F"]], false, false),
+      peg$c84 = peg$otherExpectation("blank space"),
+      peg$c85 = /^[ \t]/,
+      peg$c86 = peg$classExpectation([" ", "\t"], false, false),
+      peg$c87 = peg$otherExpectation("white space"),
+      peg$c88 = /^[ \t\n\r]/,
+      peg$c89 = peg$classExpectation([" ", "\t", "\n", "\r"], false, false),
+      peg$c90 = "\r\n",
+      peg$c91 = peg$literalExpectation("\r\n", false),
+      peg$c92 = "\n",
+      peg$c93 = peg$literalExpectation("\n", false),
+      peg$c94 = "\r",
+      peg$c95 = peg$literalExpectation("\r", false),
 
-    peg$currPos          = 0,
-    peg$savedPos         = 0,
-    peg$posDetailsCache  = [{line: 1, column: 1}],
-    peg$maxFailPos       = 0,
-    peg$maxFailExpected  = [],
-    peg$silentFails      = 0,
+      peg$currPos          = 0,
+      peg$savedPos         = 0,
+      peg$posDetailsCache  = [{ line: 1, column: 1 }],
+      peg$maxFailPos       = 0,
+      peg$maxFailExpected  = [],
+      peg$silentFails      = 0,
 
-    peg$result;
+      peg$result;
 
   if ("startRule" in options) {
-    if (!(options.startRule in peg$startRuleFunctions))
-      throw new Error(`Can't start parsing from rule "${options.startRule}".`);
-
+    if (!(options.startRule in peg$startRuleFunctions)) {
+      throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
+    }
 
     peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
   }
@@ -16541,14 +17836,12 @@ function peg$parse(input, options) {
     return input.substring(peg$savedPos, peg$currPos);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function location() {
     return peg$computeLocation(peg$savedPos, peg$currPos);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function expected(description, location) {
-    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos);
+    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
 
     throw peg$buildStructuredError(
       [peg$otherExpectation(description)],
@@ -16557,31 +17850,30 @@ function peg$parse(input, options) {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function error(message, location) {
-    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos);
+    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
 
     throw peg$buildSimpleError(message, location);
   }
 
   function peg$literalExpectation(text, ignoreCase) {
-    return {type: "literal", text: text, ignoreCase: ignoreCase};
+    return { type: "literal", text: text, ignoreCase: ignoreCase };
   }
 
   function peg$classExpectation(parts, inverted, ignoreCase) {
-    return {type: "class", parts: parts, inverted: inverted, ignoreCase: ignoreCase};
+    return { type: "class", parts: parts, inverted: inverted, ignoreCase: ignoreCase };
   }
 
   function peg$anyExpectation() {
-    return {type: "any"};
+    return { type: "any" };
   }
 
   function peg$endExpectation() {
-    return {type: "end"};
+    return { type: "end" };
   }
 
   function peg$otherExpectation(description) {
-    return {type: "other", description: description};
+    return { type: "other", description: description };
   }
 
   function peg$computePosDetails(pos) {
@@ -16591,14 +17883,14 @@ function peg$parse(input, options) {
       return details;
     } else {
       p = pos - 1;
-      while (!peg$posDetailsCache[p])
+      while (!peg$posDetailsCache[p]) {
         p--;
-
+      }
 
       details = peg$posDetailsCache[p];
       details = {
         line:   details.line,
-        column: details.column,
+        column: details.column
       };
 
       while (p < pos) {
@@ -16619,24 +17911,24 @@ function peg$parse(input, options) {
 
   function peg$computeLocation(startPos, endPos) {
     var startPosDetails = peg$computePosDetails(startPos),
-      endPosDetails   = peg$computePosDetails(endPos);
+        endPosDetails   = peg$computePosDetails(endPos);
 
     return {
       start: {
         offset: startPos,
         line:   startPosDetails.line,
-        column: startPosDetails.column,
+        column: startPosDetails.column
       },
       end: {
         offset: endPos,
         line:   endPosDetails.line,
-        column: endPosDetails.column,
-      },
+        column: endPosDetails.column
+      }
     };
   }
 
   function peg$fail(expected) {
-    if (peg$currPos < peg$maxFailPos)  return;
+    if (peg$currPos < peg$maxFailPos) { return; }
 
     if (peg$currPos > peg$maxFailPos) {
       peg$maxFailPos = peg$currPos;
@@ -16751,9 +18043,9 @@ function peg$parse(input, options) {
 
     s0 = peg$currPos;
     s1 = peg$parseB();
-    if (s1 === peg$FAILED)
+    if (s1 === peg$FAILED) {
       s1 = null;
-
+    }
     if (s1 !== peg$FAILED) {
       s2 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 35) {
@@ -16843,9 +18135,9 @@ function peg$parse(input, options) {
         peg$currPos = s2;
         s2 = peg$FAILED;
       }
-      if (s2 === peg$FAILED)
+      if (s2 === peg$FAILED) {
         s2 = null;
-
+      }
       if (s2 !== peg$FAILED) {
         s3 = [];
         s4 = peg$parseEOL_ANY();
@@ -16880,9 +18172,9 @@ function peg$parse(input, options) {
         s2 = peg$parseName();
         if (s2 !== peg$FAILED) {
           s3 = peg$parseB();
-          if (s3 === peg$FAILED)
+          if (s3 === peg$FAILED) {
             s3 = null;
-
+          }
           if (s3 !== peg$FAILED) {
             if (input.charCodeAt(peg$currPos) === 58) {
               s4 = peg$c9;
@@ -16893,9 +18185,9 @@ function peg$parse(input, options) {
             }
             if (s4 !== peg$FAILED) {
               s5 = peg$parseB();
-              if (s5 === peg$FAILED)
+              if (s5 === peg$FAILED) {
                 s5 = null;
-
+              }
               if (s5 !== peg$FAILED) {
                 s6 = peg$parseExpression();
                 if (s6 !== peg$FAILED) {
@@ -16933,9 +18225,9 @@ function peg$parse(input, options) {
           s2 = peg$parseLegacyName();
           if (s2 !== peg$FAILED) {
             s3 = peg$parseB();
-            if (s3 === peg$FAILED)
+            if (s3 === peg$FAILED) {
               s3 = null;
-
+            }
             if (s3 !== peg$FAILED) {
               if (input.charCodeAt(peg$currPos) === 58) {
                 s4 = peg$c9;
@@ -16946,9 +18238,9 @@ function peg$parse(input, options) {
               }
               if (s4 !== peg$FAILED) {
                 s5 = peg$parseB();
-                if (s5 === peg$FAILED)
+                if (s5 === peg$FAILED) {
                   s5 = null;
-
+                }
                 if (s5 !== peg$FAILED) {
                   s6 = peg$parseExpression();
                   if (s6 !== peg$FAILED) {
@@ -17032,9 +18324,9 @@ function peg$parse(input, options) {
                 s3 = [];
                 s4 = peg$currPos;
                 s5 = peg$parseB();
-                if (s5 === peg$FAILED)
+                if (s5 === peg$FAILED) {
                   s5 = null;
-
+                }
                 if (s5 !== peg$FAILED) {
                   if (input.charCodeAt(peg$currPos) === 44) {
                     s6 = peg$c12;
@@ -17045,9 +18337,9 @@ function peg$parse(input, options) {
                   }
                   if (s6 !== peg$FAILED) {
                     s7 = peg$parseB();
-                    if (s7 === peg$FAILED)
+                    if (s7 === peg$FAILED) {
                       s7 = null;
-
+                    }
                     if (s7 !== peg$FAILED) {
                       s8 = peg$parseLegacyName();
                       if (s8 !== peg$FAILED) {
@@ -17075,9 +18367,9 @@ function peg$parse(input, options) {
                     s3.push(s4);
                     s4 = peg$currPos;
                     s5 = peg$parseB();
-                    if (s5 === peg$FAILED)
+                    if (s5 === peg$FAILED) {
                       s5 = null;
-
+                    }
                     if (s5 !== peg$FAILED) {
                       if (input.charCodeAt(peg$currPos) === 44) {
                         s6 = peg$c12;
@@ -17088,9 +18380,9 @@ function peg$parse(input, options) {
                       }
                       if (s6 !== peg$FAILED) {
                         s7 = peg$parseB();
-                        if (s7 === peg$FAILED)
+                        if (s7 === peg$FAILED) {
                           s7 = null;
-
+                        }
                         if (s7 !== peg$FAILED) {
                           s8 = peg$parseLegacyName();
                           if (s8 !== peg$FAILED) {
@@ -17119,9 +18411,9 @@ function peg$parse(input, options) {
                 }
                 if (s3 !== peg$FAILED) {
                   s4 = peg$parseB();
-                  if (s4 === peg$FAILED)
+                  if (s4 === peg$FAILED) {
                     s4 = null;
-
+                  }
                   if (s4 !== peg$FAILED) {
                     if (input.charCodeAt(peg$currPos) === 58) {
                       s5 = peg$c9;
@@ -17132,9 +18424,9 @@ function peg$parse(input, options) {
                     }
                     if (s5 !== peg$FAILED) {
                       s6 = peg$parseB();
-                      if (s6 === peg$FAILED)
+                      if (s6 === peg$FAILED) {
                         s6 = null;
-
+                      }
                       if (s6 !== peg$FAILED) {
                         s7 = peg$parseExpression();
                         if (s7 !== peg$FAILED) {
@@ -17342,11 +18634,11 @@ function peg$parse(input, options) {
     if (s1 !== peg$FAILED) {
       peg$savedPos = peg$currPos;
       s2 = peg$c21(s1);
-      if (s2)
+      if (s2) {
         s2 = void 0;
-      else
+      } else {
         s2 = peg$FAILED;
-
+      }
       if (s2 !== peg$FAILED) {
         s1 = [s1, s2];
         s0 = s1;
@@ -17392,11 +18684,11 @@ function peg$parse(input, options) {
     if (s1 !== peg$FAILED) {
       peg$savedPos = peg$currPos;
       s2 = peg$c22(s1);
-      if (s2)
+      if (s2) {
         s2 = void 0;
-      else
+      } else {
         s2 = peg$FAILED;
-
+      }
       if (s2 !== peg$FAILED) {
         s1 = [s1, s2];
         s0 = s1;
@@ -17417,11 +18709,11 @@ function peg$parse(input, options) {
 
     peg$savedPos = peg$currPos;
     s0 = peg$c23();
-    if (s0)
+    if (s0) {
       s0 = void 0;
-    else
+    } else {
       s0 = peg$FAILED;
-
+    }
 
     return s0;
   }
@@ -17431,11 +18723,11 @@ function peg$parse(input, options) {
 
     peg$savedPos = peg$currPos;
     s0 = peg$c24();
-    if (s0)
+    if (s0) {
       s0 = void 0;
-    else
+    } else {
       s0 = peg$FAILED;
-
+    }
 
     return s0;
   }
@@ -17444,9 +18736,9 @@ function peg$parse(input, options) {
     var s0;
 
     s0 = peg$parsestring();
-    if (s0 === peg$FAILED)
+    if (s0 === peg$FAILED) {
       s0 = peg$parsepseudostring();
-
+    }
 
     return s0;
   }
@@ -17524,9 +18816,9 @@ function peg$parse(input, options) {
       s2 = [];
       s3 = peg$currPos;
       s4 = peg$parseB();
-      if (s4 === peg$FAILED)
+      if (s4 === peg$FAILED) {
         s4 = null;
-
+      }
       if (s4 !== peg$FAILED) {
         if (peg$c29.test(input.charAt(peg$currPos))) {
           s5 = input.charAt(peg$currPos);
@@ -17550,9 +18842,9 @@ function peg$parse(input, options) {
         s2.push(s3);
         s3 = peg$currPos;
         s4 = peg$parseB();
-        if (s4 === peg$FAILED)
+        if (s4 === peg$FAILED) {
           s4 = null;
-
+        }
         if (s4 !== peg$FAILED) {
           if (peg$c29.test(input.charAt(peg$currPos))) {
             s5 = input.charAt(peg$currPos);
@@ -17605,9 +18897,9 @@ function peg$parse(input, options) {
       s1 = peg$FAILED;
       if (peg$silentFails === 0) { peg$fail(peg$c33); }
     }
-    if (s1 === peg$FAILED)
+    if (s1 === peg$FAILED) {
       s1 = null;
-
+    }
     if (s1 !== peg$FAILED) {
       if (peg$c34.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
@@ -18035,7 +19327,6 @@ function peg$parse(input, options) {
     return s0;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function peg$parseS() {
     var s0, s1;
 
@@ -18071,7 +19362,6 @@ function peg$parse(input, options) {
     return s0;
   }
 
-  // eslint-disable-next-line @typescript-eslint/camelcase
   function peg$parseEOL_ANY() {
     var s0, s1, s2, s3, s4, s5;
 
@@ -18081,9 +19371,9 @@ function peg$parse(input, options) {
       s2 = [];
       s3 = peg$currPos;
       s4 = peg$parseB();
-      if (s4 === peg$FAILED)
+      if (s4 === peg$FAILED) {
         s4 = null;
-
+      }
       if (s4 !== peg$FAILED) {
         s5 = peg$parseEOL();
         if (s5 !== peg$FAILED) {
@@ -18101,9 +19391,9 @@ function peg$parse(input, options) {
         s2.push(s3);
         s3 = peg$currPos;
         s4 = peg$parseB();
-        if (s4 === peg$FAILED)
+        if (s4 === peg$FAILED) {
           s4 = null;
-
+        }
         if (s4 !== peg$FAILED) {
           s5 = peg$parseEOL();
           if (s5 !== peg$FAILED) {
@@ -18166,9 +19456,9 @@ function peg$parse(input, options) {
   }
 
 
-  const INDENT_STEP = 2;
+    const INDENT_STEP = 2;
 
-  let indentLevel = 0;
+    let indentLevel = 0;
 
 
   peg$result = peg$startRuleFunction();
@@ -18176,9 +19466,9 @@ function peg$parse(input, options) {
   if (peg$result !== peg$FAILED && peg$currPos === input.length) {
     return peg$result;
   } else {
-    if (peg$result !== peg$FAILED && peg$currPos < input.length)
+    if (peg$result !== peg$FAILED && peg$currPos < input.length) {
       peg$fail(peg$endExpectation());
-
+    }
 
     throw peg$buildStructuredError(
       peg$maxFailExpected,
@@ -18192,7 +19482,7 @@ function peg$parse(input, options) {
 
 module.exports = {
   SyntaxError: peg$SyntaxError,
-  parse:       peg$parse,
+  parse:       peg$parse
 };
 
 
@@ -18204,9 +19494,22 @@ module.exports = {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.stringifySyml = exports.parseSyml = exports.stringifyResolution = exports.parseResolution = exports.parseShell = void 0;
+exports.stringifySyml = exports.parseSyml = exports.stringifyResolution = exports.parseResolution = exports.stringifyValueArgument = exports.stringifyShellLine = exports.stringifyRedirectArgument = exports.stringifyEnvSegment = exports.stringifyCommandLineThen = exports.stringifyCommandLine = exports.stringifyCommandChainThen = exports.stringifyCommandChain = exports.stringifyCommand = exports.stringifyArithmeticExpression = exports.stringifyArgumentSegment = exports.stringifyArgument = exports.stringifyShell = exports.parseShell = void 0;
 var shell_1 = __nccwpck_require__(1406);
 Object.defineProperty(exports, "parseShell", ({ enumerable: true, get: function () { return shell_1.parseShell; } }));
+Object.defineProperty(exports, "stringifyShell", ({ enumerable: true, get: function () { return shell_1.stringifyShell; } }));
+Object.defineProperty(exports, "stringifyArgument", ({ enumerable: true, get: function () { return shell_1.stringifyArgument; } }));
+Object.defineProperty(exports, "stringifyArgumentSegment", ({ enumerable: true, get: function () { return shell_1.stringifyArgumentSegment; } }));
+Object.defineProperty(exports, "stringifyArithmeticExpression", ({ enumerable: true, get: function () { return shell_1.stringifyArithmeticExpression; } }));
+Object.defineProperty(exports, "stringifyCommand", ({ enumerable: true, get: function () { return shell_1.stringifyCommand; } }));
+Object.defineProperty(exports, "stringifyCommandChain", ({ enumerable: true, get: function () { return shell_1.stringifyCommandChain; } }));
+Object.defineProperty(exports, "stringifyCommandChainThen", ({ enumerable: true, get: function () { return shell_1.stringifyCommandChainThen; } }));
+Object.defineProperty(exports, "stringifyCommandLine", ({ enumerable: true, get: function () { return shell_1.stringifyCommandLine; } }));
+Object.defineProperty(exports, "stringifyCommandLineThen", ({ enumerable: true, get: function () { return shell_1.stringifyCommandLineThen; } }));
+Object.defineProperty(exports, "stringifyEnvSegment", ({ enumerable: true, get: function () { return shell_1.stringifyEnvSegment; } }));
+Object.defineProperty(exports, "stringifyRedirectArgument", ({ enumerable: true, get: function () { return shell_1.stringifyRedirectArgument; } }));
+Object.defineProperty(exports, "stringifyShellLine", ({ enumerable: true, get: function () { return shell_1.stringifyShellLine; } }));
+Object.defineProperty(exports, "stringifyValueArgument", ({ enumerable: true, get: function () { return shell_1.stringifyValueArgument; } }));
 var resolution_1 = __nccwpck_require__(817);
 Object.defineProperty(exports, "parseResolution", ({ enumerable: true, get: function () { return resolution_1.parseResolution; } }));
 Object.defineProperty(exports, "stringifyResolution", ({ enumerable: true, get: function () { return resolution_1.stringifyResolution; } }));
@@ -18230,7 +19533,7 @@ function parseResolution(source) {
     if (legacyResolution)
         throw new Error(`The override for '${source}' includes a glob pattern. Glob patterns have been removed since their behaviours don't match what you'd expect. Set the override to '${legacyResolution[1]}' instead.`);
     try {
-        return resolution_1.parse(source);
+        return (0, resolution_1.parse)(source);
     }
     catch (error) {
         if (error.location)
@@ -18263,11 +19566,11 @@ exports.stringifyResolution = stringifyResolution;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.parseShell = void 0;
+exports.stringifyShell = exports.stringifyArithmeticExpression = exports.stringifyArgumentSegment = exports.stringifyValueArgument = exports.stringifyRedirectArgument = exports.stringifyArgument = exports.stringifyEnvSegment = exports.stringifyCommand = exports.stringifyCommandChainThen = exports.stringifyCommandChain = exports.stringifyCommandLineThen = exports.stringifyCommandLine = exports.stringifyShellLine = exports.parseShell = void 0;
 const shell_1 = __nccwpck_require__(5010);
 function parseShell(source, options = { isGlobPattern: () => false }) {
     try {
-        return shell_1.parse(source, options);
+        return (0, shell_1.parse)(source, options);
     }
     catch (error) {
         if (error.location)
@@ -18276,6 +19579,135 @@ function parseShell(source, options = { isGlobPattern: () => false }) {
     }
 }
 exports.parseShell = parseShell;
+function stringifyShellLine(shellLine, { endSemicolon = false } = {}) {
+    return shellLine
+        .map(({ command, type }, index) => `${stringifyCommandLine(command)}${type === `;`
+        ? (index !== shellLine.length - 1 || endSemicolon ? `;` : ``)
+        : ` &`}`)
+        .join(` `);
+}
+exports.stringifyShellLine = stringifyShellLine;
+exports.stringifyShell = stringifyShellLine;
+function stringifyCommandLine(commandLine) {
+    return `${stringifyCommandChain(commandLine.chain)}${commandLine.then ? ` ${stringifyCommandLineThen(commandLine.then)}` : ``}`;
+}
+exports.stringifyCommandLine = stringifyCommandLine;
+function stringifyCommandLineThen(commandLineThen) {
+    return `${commandLineThen.type} ${stringifyCommandLine(commandLineThen.line)}`;
+}
+exports.stringifyCommandLineThen = stringifyCommandLineThen;
+function stringifyCommandChain(commandChain) {
+    return `${stringifyCommand(commandChain)}${commandChain.then ? ` ${stringifyCommandChainThen(commandChain.then)}` : ``}`;
+}
+exports.stringifyCommandChain = stringifyCommandChain;
+function stringifyCommandChainThen(commandChainThen) {
+    return `${commandChainThen.type} ${stringifyCommandChain(commandChainThen.chain)}`;
+}
+exports.stringifyCommandChainThen = stringifyCommandChainThen;
+function stringifyCommand(command) {
+    switch (command.type) {
+        case `command`:
+            return `${command.envs.length > 0 ? `${command.envs.map(env => stringifyEnvSegment(env)).join(` `)} ` : ``}${command.args.map(argument => stringifyArgument(argument)).join(` `)}`;
+        case `subshell`:
+            return `(${stringifyShellLine(command.subshell)})${command.args.length > 0 ? ` ${command.args.map(argument => stringifyRedirectArgument(argument)).join(` `)}` : ``}`;
+        case `group`:
+            return `{ ${stringifyShellLine(command.group, { /* Bash compat */ endSemicolon: true })} }${command.args.length > 0 ? ` ${command.args.map(argument => stringifyRedirectArgument(argument)).join(` `)}` : ``}`;
+        case `envs`:
+            return command.envs.map(env => stringifyEnvSegment(env)).join(` `);
+        default:
+            throw new Error(`Unsupported command type:  "${command.type}"`);
+    }
+}
+exports.stringifyCommand = stringifyCommand;
+function stringifyEnvSegment(envSegment) {
+    return `${envSegment.name}=${envSegment.args[0] ? stringifyValueArgument(envSegment.args[0]) : ``}`;
+}
+exports.stringifyEnvSegment = stringifyEnvSegment;
+function stringifyArgument(argument) {
+    switch (argument.type) {
+        case `redirection`:
+            return stringifyRedirectArgument(argument);
+        case `argument`:
+            return stringifyValueArgument(argument);
+        default:
+            throw new Error(`Unsupported argument type: "${argument.type}"`);
+    }
+}
+exports.stringifyArgument = stringifyArgument;
+function stringifyRedirectArgument(argument) {
+    return `${argument.subtype} ${argument.args.map(argument => stringifyValueArgument(argument)).join(` `)}`;
+}
+exports.stringifyRedirectArgument = stringifyRedirectArgument;
+function stringifyValueArgument(argument) {
+    return argument.segments.map(segment => stringifyArgumentSegment(segment)).join(``);
+}
+exports.stringifyValueArgument = stringifyValueArgument;
+function stringifyArgumentSegment(argumentSegment) {
+    const doubleQuoteIfRequested = (string, quote) => quote ? `"${string}"` : string;
+    const quoteIfNeeded = (text) => {
+        if (text === ``)
+            return `""`;
+        if (!text.match(/[(){}<>$|&; \t"']/))
+            return text;
+        return `$'${text
+            .replace(/\\/g, `\\\\`)
+            .replace(/'/g, `\\'`)
+            .replace(/\f/g, `\\f`)
+            .replace(/\n/g, `\\n`)
+            .replace(/\r/g, `\\r`)
+            .replace(/\t/g, `\\t`)
+            .replace(/\v/g, `\\v`)
+            .replace(/\0/g, `\\0`)}'`;
+    };
+    switch (argumentSegment.type) {
+        case `text`:
+            return quoteIfNeeded(argumentSegment.text);
+        case `glob`:
+            return argumentSegment.pattern;
+        case `shell`:
+            return doubleQuoteIfRequested(`\${${stringifyShellLine(argumentSegment.shell)}}`, argumentSegment.quoted);
+        case `variable`:
+            return doubleQuoteIfRequested(typeof argumentSegment.defaultValue === `undefined`
+                ? `\${${argumentSegment.name}}`
+                : argumentSegment.defaultValue.length === 0
+                    ? `\${${argumentSegment.name}:-}`
+                    : `\${${argumentSegment.name}:-${argumentSegment.defaultValue.map(argument => stringifyValueArgument(argument)).join(` `)}}`, argumentSegment.quoted);
+        case `arithmetic`:
+            return `$(( ${stringifyArithmeticExpression(argumentSegment.arithmetic)} ))`;
+        default:
+            throw new Error(`Unsupported argument segment type: "${argumentSegment.type}"`);
+    }
+}
+exports.stringifyArgumentSegment = stringifyArgumentSegment;
+function stringifyArithmeticExpression(argument) {
+    const getOperator = (type) => {
+        switch (type) {
+            case `addition`:
+                return `+`;
+            case `subtraction`:
+                return `-`;
+            case `multiplication`:
+                return `*`;
+            case `division`:
+                return `/`;
+            default:
+                throw new Error(`Can't extract operator from arithmetic expression of type "${type}"`);
+        }
+    };
+    const parenthesizeIfRequested = (string, parenthesize) => parenthesize ? `( ${string} )` : string;
+    const stringifyAndParenthesizeIfNeeded = (expression) => 
+    // Right now we parenthesize all arithmetic operator expressions because it's easier
+    parenthesizeIfRequested(stringifyArithmeticExpression(expression), ![`number`, `variable`].includes(expression.type));
+    switch (argument.type) {
+        case `number`:
+            return String(argument.value);
+        case `variable`:
+            return argument.name;
+        default:
+            return `${stringifyAndParenthesizeIfNeeded(argument.left)} ${getOperator(argument.type)} ${stringifyAndParenthesizeIfNeeded(argument.right)}`;
+    }
+}
+exports.stringifyArithmeticExpression = stringifyArithmeticExpression;
 
 
 /***/ }),
@@ -18287,7 +19719,6 @@ exports.parseShell = parseShell;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.parseSyml = exports.stringifySyml = exports.PreserveOrdering = void 0;
-// @ts-expect-error
 const js_yaml_1 = __nccwpck_require__(1917);
 const syml_1 = __nccwpck_require__(2294);
 const simpleStringPattern = /^(?![-?:,\][{}#&*!|>'"%@` \t\r\n]).([ \t]*(?![,\][{}:# \t\r\n]).)*$/;
@@ -18398,14 +19829,15 @@ stringifySyml.PreserveOrdering = PreserveOrdering;
 function parseViaPeg(source) {
     if (!source.endsWith(`\n`))
         source += `\n`;
-    return syml_1.parse(source);
+    return (0, syml_1.parse)(source);
 }
 const LEGACY_REGEXP = /^(#.*(\r?\n))*?#\s+yarn\s+lockfile\s+v1\r?\n/i;
 function parseViaJsYaml(source) {
     if (LEGACY_REGEXP.test(source))
         return parseViaPeg(source);
-    const value = js_yaml_1.safeLoad(source, {
+    const value = (0, js_yaml_1.safeLoad)(source, {
         schema: js_yaml_1.FAILSAFE_SCHEMA,
+        json: true,
     });
     // Empty files are parsed as `undefined` instead of an empty object
     // Empty files with 2 newlines or more are `null` instead
@@ -18433,7 +19865,7 @@ exports.parseSyml = parseSyml;
 
 module.exports = ({onlyFirst = false} = {}) => {
 	const pattern = [
-		'[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
+		'[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
 		'(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-ntqry=><~]))'
 	].join('|');
 
@@ -18617,115 +20049,130 @@ Object.defineProperty(module, 'exports', {
 
 /***/ }),
 
-/***/ 9823:
+/***/ 4335:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
+
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.lazy_unique_overwrite = exports.lazy_unique = exports.array_unique_overwrite = exports.array_unique = void 0;
-const tslib_1 = __nccwpck_require__(4351);
-const util_1 = __nccwpck_require__(1437);
-(0, tslib_1.__exportStar)(__nccwpck_require__(5097), exports);
-(0, tslib_1.__exportStar)(__nccwpck_require__(1437), exports);
+
+var _equals = __nccwpck_require__(3588);
+var lodash = __nccwpck_require__(250);
+
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+var _equals__default = /*#__PURE__*/_interopDefaultLegacy(_equals);
+
+function equals(a1, a2) {
+  return _equals__default["default"](a1, a2);
+}
+function defaultFilter(options = {}) {
+  const checker = options.checker || defaultChecker;
+  const filter = options.filter || null;
+  const find = options.removeFromFirst ? lodash.findLastIndex : lodash.findIndex;
+
+  const cb = (val, index, arr) => {
+    let i = find(arr, a => checker(a, val, arr, arr));
+    return i == index && (!filter || filter(val));
+  };
+
+  return cb;
+}
+function defaultChecker(element, value, arr_new, arr_old) {
+  return _equals__default["default"](element, value);
+}
+
 function array_unique(arr, options = {}) {
-    if (!Array.isArray(arr)) {
-        throw new TypeError(`Expected an Array but got ${typeof arr}.`);
+  if (!Array.isArray(arr)) {
+    throw new TypeError(`Expected an Array but got ${typeof arr}.`);
+  }
+
+  const cb = defaultFilter(options);
+
+  if (options.overwrite) {
+    let index = arr.length;
+
+    while (index--) {
+      let val = arr[index];
+
+      if (!cb(val, index, arr)) {
+        arr.splice(index, 1);
+      }
     }
-    const cb = (0, util_1.defaultFilter)(options);
-    if (options.overwrite) {
-        let index = arr.length;
-        while (index--) {
-            let val = arr[index];
-            if (!cb(val, index, arr)) {
-                arr.splice(index, 1);
-            }
-        }
-        return arr;
-    }
-    // @ts-ignore
-    return arr.filter(cb);
+
+    return arr;
+  }
+
+  return arr.filter(cb);
 }
-exports.array_unique = array_unique;
 function array_unique_overwrite(arr, options = {}) {
-    return array_unique(arr, {
-        ...options,
-        overwrite: true,
-    });
+  return array_unique(arr, { ...options,
+    overwrite: true
+  });
 }
-exports.array_unique_overwrite = array_unique_overwrite;
-// @ts-ignore
 function lazy_unique(...arr) {
-    if (arr.length > 1) {
-        return array_unique(arr);
-    }
-    return array_unique(arr[0]);
+  if (arr.length > 1) {
+    return array_unique(arr);
+  }
+
+  return array_unique(arr[0]);
 }
-exports.lazy_unique = lazy_unique;
 function lazy_unique_overwrite(...arr) {
-    if (arr.length > 1) {
-        return array_unique_overwrite(arr);
-    }
-    return array_unique_overwrite(arr[0]);
+  if (arr.length > 1) {
+    return array_unique_overwrite(arr);
+  }
+
+  return array_unique_overwrite(arr[0]);
 }
-exports.lazy_unique_overwrite = lazy_unique_overwrite;
 lazy_unique.array_unique = array_unique;
 lazy_unique.array_unique_overwrite = array_unique_overwrite;
 lazy_unique.lazy_unique_overwrite = lazy_unique_overwrite;
-lazy_unique.equals = util_1.equals;
-lazy_unique.defaultFilter = util_1.defaultFilter;
-lazy_unique.defaultChecker = util_1.defaultChecker;
+lazy_unique.equals = equals;
+lazy_unique.defaultFilter = defaultFilter;
+lazy_unique.defaultChecker = defaultChecker;
 lazy_unique.lazy_unique = lazy_unique;
 lazy_unique.default = lazy_unique;
-Object.defineProperty(lazy_unique, "__esModule", { value: true });
-exports.default = lazy_unique;
-//# sourceMappingURL=index.js.map
+Object.defineProperty(lazy_unique, "__esModule", {
+  value: true
+});
+
+exports.array_unique = array_unique;
+exports.array_unique_overwrite = array_unique_overwrite;
+exports["default"] = lazy_unique;
+exports.defaultChecker = defaultChecker;
+exports.defaultFilter = defaultFilter;
+exports.equals = equals;
+exports.lazy_unique = lazy_unique;
+exports.lazy_unique_overwrite = lazy_unique_overwrite;
+//# sourceMappingURL=index.cjs.development.js.map
+
 
 /***/ }),
 
-/***/ 5097:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/**
- * Created by user on 2020/6/6.
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-//# sourceMappingURL=types.js.map
-
-/***/ }),
-
-/***/ 1437:
+/***/ 2247:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
+Object.defineProperty(exports, "__esModule", ({value:!0}));var e=__nccwpck_require__(3588),r=__nccwpck_require__(250);function t(e){return e&&"object"==typeof e&&"default"in e?e:{default:e}}var u=t(e);function n(e,r){return u.default(e,r)}function i(e={}){const t=e.checker||o,u=e.filter||null,n=e.removeFromFirst?r.findLastIndex:r.findIndex;return(e,r,i)=>n(i,(r=>t(r,e,i,i)))==r&&(!u||u(e))}function o(e,r,t,n){return u.default(e,r)}function a(e,r={}){if(!Array.isArray(e))throw new TypeError(`Expected an Array but got ${typeof e}.`);const t=i(r);if(r.overwrite){let r=e.length;for(;r--;)t(e[r],r,e)||e.splice(r,1);return e}return e.filter(t)}function l(e,r={}){return a(e,{...r,overwrite:!0})}function f(...e){return a(e.length>1?e:e[0])}function s(...e){return l(e.length>1?e:e[0])}f.array_unique=a,f.array_unique_overwrite=l,f.lazy_unique_overwrite=s,f.equals=n,f.defaultFilter=i,f.defaultChecker=o,f.lazy_unique=f,f.default=f,Object.defineProperty(f,"__esModule",{value:!0}),exports.array_unique=a,exports.array_unique_overwrite=l,exports["default"]=f,exports.defaultChecker=o,exports.defaultFilter=i,exports.equals=n,exports.lazy_unique=f,exports.lazy_unique_overwrite=s;
+//# sourceMappingURL=index.cjs.production.min.js.map
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.defaultChecker = exports.defaultFilter = exports.equals = void 0;
-const tslib_1 = __nccwpck_require__(4351);
-const deep_eql_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(3588));
-const lodash_1 = __nccwpck_require__(250);
-function equals(a1, a2) {
-    return (0, deep_eql_1.default)(a1, a2);
+
+/***/ }),
+
+/***/ 3603:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+
+if (process.env.NODE_ENV === 'production') {
+  module.exports = __nccwpck_require__(2247)
+} else {
+  module.exports = __nccwpck_require__(4335)
 }
-exports.equals = equals;
-function defaultFilter(options = {}) {
-    const checker = options.checker || defaultChecker;
-    const filter = options.filter || null;
-    const find = options.removeFromFirst ? lodash_1.findLastIndex : lodash_1.findIndex;
-    const cb = (val, index, arr) => {
-        let i = find(arr, a => checker(a, val, arr, arr));
-        return i == index && (!filter || filter(val));
-    };
-    return cb;
-}
-exports.defaultFilter = defaultFilter;
-function defaultChecker(element, value, arr_new, arr_old) {
-    return (0, deep_eql_1.default)(element, value);
-}
-exports.defaultChecker = defaultChecker;
-//# sourceMappingURL=util.js.map
+
 
 /***/ }),
 
@@ -19666,7 +21113,7 @@ exports.flatten = (...args) => {
 
 const escapeStringRegexp = __nccwpck_require__(8691);
 const ansiStyles = __nccwpck_require__(2068);
-const stdoutColor = __nccwpck_require__(9318).stdout;
+const stdoutColor = (__nccwpck_require__(9318).stdout);
 
 const template = __nccwpck_require__(2138);
 
@@ -19890,7 +21337,7 @@ Object.defineProperties(Chalk.prototype, styles);
 
 module.exports = Chalk(); // eslint-disable-line new-cap
 module.exports.supportsColor = stdoutColor;
-module.exports.default = module.exports; // For TypeScript
+module.exports["default"] = module.exports; // For TypeScript
 
 
 /***/ }),
@@ -20419,16 +21866,16 @@ module.exports.RowSpanCell = RowSpanCell;
 /***/ 3875:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const objectAssign = __nccwpck_require__(7426);
 const Cell = __nccwpck_require__(6168);
 const { ColSpanCell, RowSpanCell } = Cell;
 
 (function () {
   function layoutTable(table) {
     table.forEach(function (row, rowIndex) {
+      let prevCell = null;
       row.forEach(function (cell, columnIndex) {
         cell.y = rowIndex;
-        cell.x = columnIndex;
+        cell.x = prevCell ? prevCell.x + 1 : columnIndex;
         for (let y = rowIndex; y >= 0; y--) {
           let row2 = table[y];
           let xMax = y === rowIndex ? columnIndex : row2.length;
@@ -20438,6 +21885,7 @@ const { ColSpanCell, RowSpanCell } = Cell;
               cell.x++;
             }
           }
+          prevCell = cell;
         }
       });
     });
@@ -20645,7 +22093,7 @@ function makeComputeWidths(colSpan, desiredWidth, x, forcedMin) {
       }
     }
 
-    objectAssign(vals, result);
+    Object.assign(vals, result);
     for (let j = 0; j < vals.length; j++) {
       vals[j] = Math.max(forcedMin, vals[j] || 0);
     }
@@ -20742,7 +22190,6 @@ module.exports = Table;
 /***/ 8911:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const objectAssign = __nccwpck_require__(7426);
 const stringWidth = __nccwpck_require__(2577);
 
 function codeRegex(capture) {
@@ -20979,9 +22426,9 @@ function defaultOptions() {
 function mergeOptions(options, defaults) {
   options = options || {};
   defaults = defaults || defaultOptions();
-  let ret = objectAssign({}, defaults, options);
-  ret.chars = objectAssign({}, defaults.chars, options.chars);
-  ret.style = objectAssign({}, defaults.style, options.style);
+  let ret = Object.assign({}, defaults, options);
+  ret.chars = Object.assign({}, defaults.chars, options.chars);
+  ret.style = Object.assign({}, defaults.style, options.style);
   return ret;
 }
 
@@ -21030,7 +22477,7 @@ function colorizeLines(input) {
   for (let i = 0; i < input.length; i++) {
     let line = rewindState(state, input[i]);
     state = readState(line);
-    let temp = objectAssign({}, state);
+    let temp = Object.assign({}, state);
     output.push(unwindState(temp, line));
   }
   return output;
@@ -22311,12 +23758,12 @@ module['exports'] = colors;
 
 colors.themes = {};
 
-var util = __nccwpck_require__(1669);
+var util = __nccwpck_require__(3837);
 var ansiStyles = colors.styles = __nccwpck_require__(3104);
 var defineProps = Object.defineProperties;
 var newLineRegex = new RegExp(/[\r\n]+/g);
 
-colors.supportsColor = __nccwpck_require__(662).supportsColor;
+colors.supportsColor = (__nccwpck_require__(662).supportsColor);
 
 if (typeof colors.enabled === 'undefined') {
   colors.enabled = colors.supportsColor() !== false;
@@ -22903,7 +24350,7 @@ THE SOFTWARE.
 
 
 
-var os = __nccwpck_require__(2087);
+var os = __nccwpck_require__(2037);
 var hasFlag = __nccwpck_require__(223);
 
 var env = process.env;
@@ -23048,50 +24495,6 @@ module['exports'] = colors;
 
 /***/ }),
 
-/***/ 901:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-/**
- * Created by user on 2018/1/26/026.
- */
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.crlf_unicode_normalize = exports.lineSplit = exports.chkcrlf = exports.crlf = exports.R_CRLF = exports.LF = exports.CRLF = exports.CR = void 0;
-exports.CR = "\r";
-exports.CRLF = "\r\n";
-exports.LF = "\n";
-exports.R_CRLF = /\r\n|\r(?!\n)|\n/g;
-function crlf(text, newline = exports.LF) {
-    return text.replace(exports.R_CRLF, newline);
-}
-exports.crlf = crlf;
-function chkcrlf(text) {
-    return {
-        lf: /\n/.test(text.replace(/\r\n/g, '')),
-        crlf: /\r\n/.test(text),
-        cr: /\r(?!\n)/.test(text),
-    };
-}
-exports.chkcrlf = chkcrlf;
-function lineSplit(text) {
-    return text.split(exports.R_CRLF);
-}
-exports.lineSplit = lineSplit;
-function crlf_unicode_normalize(text, newline = exports.LF) {
-    const ln3 = newline + newline + newline;
-    const ln2 = newline + newline;
-    return text
-        .replace(/\u000C/g, ln3)
-        .replace(/\u2028/g, newline)
-        .replace(/\u2029/g, ln2);
-}
-exports.crlf_unicode_normalize = crlf_unicode_normalize;
-exports.default = crlf;
-//# sourceMappingURL=index.js.map
-
-/***/ }),
-
 /***/ 6465:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -23117,7 +24520,7 @@ Object.defineProperty(exports, "createFnChalkByConsole", ({ enumerable: true, ge
 Object.defineProperty(exports, "chalkByConsoleMaybe", ({ enumerable: true, get: function () { return util_2.chalkByConsoleMaybe; } }));
 exports.console = new auto_1.Console2();
 exports.chalkByConsole = (0, util_1.createFnChalkByConsole)(exports.console);
-exports.default = exports.console;
+exports["default"] = exports.console;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -23128,7 +24531,7 @@ exports.default = exports.console;
 "use strict";
 
 
-if (__nccwpck_require__(9685).isNodeJs())
+if ((__nccwpck_require__(9685).isNodeJs)())
 {
 	module.exports = __nccwpck_require__(6474);
 }
@@ -23160,7 +24563,7 @@ class Console2 extends node_1.default {
     }
 }
 exports.Console2 = Console2;
-exports.default = Console2;
+exports["default"] = Console2;
 //# sourceMappingURL=browser.js.map
 
 /***/ }),
@@ -23174,7 +24577,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.isNodeJs = void 0;
 function isNodeJs() {
     try {
-        __nccwpck_require__(7082);
+        __nccwpck_require__(6206);
         // @ts-ignore
         if (console._stdout && console._stderr) {
             return true;
@@ -23185,7 +24588,7 @@ function isNodeJs() {
     return false;
 }
 exports.isNodeJs = isNodeJs;
-exports.default = isNodeJs;
+exports["default"] = isNodeJs;
 //# sourceMappingURL=chk.js.map
 
 /***/ }),
@@ -23338,7 +24741,7 @@ exports._logArgv = _logArgv;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports._logFormat = void 0;
-var util_1 = __nccwpck_require__(1669);
+var util_1 = __nccwpck_require__(3837);
 Object.defineProperty(exports, "_logFormat", ({ enumerable: true, get: function () { return util_1.format; } }));
 //# sourceMappingURL=_logFormat.js.map
 
@@ -23428,7 +24831,7 @@ function fillProperty(target, ls, fn) {
     return target;
 }
 exports.fillProperty = fillProperty;
-exports.default = fillProperty;
+exports["default"] = fillProperty;
 //# sourceMappingURL=fill-property.js.map
 
 /***/ }),
@@ -23446,7 +24849,7 @@ exports.Console2 = void 0;
 const tslib_1 = __nccwpck_require__(4351);
 /// <reference types="node" />
 const chalk_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(8707));
-const util_1 = __nccwpck_require__(1669);
+const util_1 = __nccwpck_require__(3837);
 const chk_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(9685));
 const fill_property_1 = __nccwpck_require__(426);
 const styles_1 = __nccwpck_require__(4976);
@@ -23727,7 +25130,7 @@ fill_property_1.methods.forEach(function (name) {
         };
     }
 });
-exports.default = Console2;
+exports["default"] = Console2;
 //# sourceMappingURL=node.js.map
 
 /***/ }),
@@ -23768,7 +25171,7 @@ exports.styleNamesFn = [
     'keyword',
 ];
 exports.styleNamesWithoutFn = exports.styleNames.filter(name => !exports.styleNamesFn.includes(name));
-exports.default = exports;
+exports["default"] = exports;
 //# sourceMappingURL=styles.js.map
 
 /***/ }),
@@ -23849,7 +25252,7 @@ function arrayIncludes(arr, value) {
     return arr.includes(value);
 }
 exports.arrayIncludes = arrayIncludes;
-exports.default = exports;
+exports["default"] = exports;
 //# sourceMappingURL=util.js.map
 
 /***/ }),
@@ -23957,7 +25360,7 @@ exports.defaultColors = {
     success: 'green',
     ok: 'green',
 };
-exports.default = exports;
+exports["default"] = exports;
 //# sourceMappingURL=val.js.map
 
 /***/ }),
@@ -24500,7 +25903,7 @@ function envBool(val, mode2 = true) {
     return typeof v === 'string' ? false : v;
 }
 exports.envBool = envBool;
-exports.default = envBool;
+exports["default"] = envBool;
 // @ts-ignore
 exports = Object.assign(envBool, exports);
 Object.defineProperty(exports, "__esModule", ({ value: true }));
@@ -24617,7 +26020,7 @@ module.exports = function (str) {
 
 
 
-const util = __nccwpck_require__(1669);
+const util = __nccwpck_require__(3837);
 const toRegexRange = __nccwpck_require__(1861);
 
 const isObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
@@ -24866,7 +26269,7 @@ module.exports = fill;
 
 "use strict";
 
-const path = __nccwpck_require__(5622);
+const path = __nccwpck_require__(1017);
 const locatePath = __nccwpck_require__(3447);
 const pathExists = __nccwpck_require__(6978);
 
@@ -24967,9 +26370,9 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.readPackageJSON = exports.extractWorkspaces = exports.isMatchWorkspaces = exports.checkWorkspaces = exports.findWorkspaceRoot = void 0;
 const tslib_1 = __nccwpck_require__(4351);
 const upath2_1 = __nccwpck_require__(1306);
-const pkg_dir_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(8098));
-const fs_1 = __nccwpck_require__(5747);
-const micromatch_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(6228));
+const pkg_dir_1 = tslib_1.__importDefault(__nccwpck_require__(8098));
+const fs_1 = __nccwpck_require__(7147);
+const micromatch_1 = tslib_1.__importDefault(__nccwpck_require__(6228));
 /**
  * Adapted from:
  * https://github.com/yarnpkg/yarn/blob/ddf2f9ade211195372236c2f39a75b00fa18d4de/src/config.js#L612
@@ -25046,7 +26449,7 @@ findWorkspaceRoot.readPackageJSON = readPackageJSON;
 findWorkspaceRoot.extractWorkspaces = extractWorkspaces;
 findWorkspaceRoot.isMatchWorkspaces = isMatchWorkspaces;
 findWorkspaceRoot.default = findWorkspaceRoot;
-exports.default = findWorkspaceRoot;
+exports["default"] = findWorkspaceRoot;
 //# sourceMappingURL=core.js.map
 
 /***/ }),
@@ -25212,6 +26615,36 @@ gitHosts.gist = Object.assign({}, defaults, {
   }
 })
 
+gitHosts.sourcehut = Object.assign({}, defaults, {
+  protocols: ['git+ssh:', 'https:'],
+  domain: 'git.sr.ht',
+  treepath: 'tree',
+  browsefiletemplate: ({ domain, user, project, committish, treepath, path, fragment, hashformat }) => `https://${domain}/${user}/${project}/${treepath}/${maybeEncode(committish || 'main')}/${path}${maybeJoin('#', hashformat(fragment || ''))}`,
+  filetemplate: ({ domain, user, project, committish, path }) => `https://${domain}/${user}/${project}/blob/${maybeEncode(committish) || 'main'}/${path}`,
+  httpstemplate: ({ domain, user, project, committish }) => `https://${domain}/${user}/${project}.git${maybeJoin('#', committish)}`,
+  tarballtemplate: ({ domain, user, project, committish }) => `https://${domain}/${user}/${project}/archive/${maybeEncode(committish) || 'main'}.tar.gz`,
+  bugstemplate: ({ domain, user, project }) => `https://todo.sr.ht/${user}/${project}`,
+  docstemplate: ({ domain, user, project, treepath, committish }) => `https://${domain}/${user}/${project}${maybeJoin('/', treepath, '/', maybeEncode(committish))}#readme`,
+  extract: (url) => {
+    let [, user, project, aux] = url.pathname.split('/', 4)
+
+    // tarball url
+    if (['archive'].includes(aux)) {
+      return
+    }
+
+    if (project && project.endsWith('.git')) {
+      project = project.slice(0, -4)
+    }
+
+    if (!user || !project) {
+      return
+    }
+
+    return { user, project, committish: url.hash.slice(1) }
+  }
+})
+
 const names = Object.keys(gitHosts)
 gitHosts.byShortcut = {}
 gitHosts.byDomain = {}
@@ -25352,7 +26785,7 @@ module.exports = GitHost
 
 "use strict";
 
-const url = __nccwpck_require__(8835)
+const url = __nccwpck_require__(7310)
 const gitHosts = __nccwpck_require__(135)
 const GitHost = module.exports = __nccwpck_require__(8145)
 const LRU = __nccwpck_require__(7129)
@@ -25645,7 +27078,7 @@ const isFullwidthCodePoint = codePoint => {
 };
 
 module.exports = isFullwidthCodePoint;
-module.exports.default = isFullwidthCodePoint;
+module.exports["default"] = isFullwidthCodePoint;
 
 
 /***/ }),
@@ -29848,9 +31281,9 @@ module.exports = new Type('tag:yaml.org,2002:timestamp', {
 
 "use strict";
 
-const path = __nccwpck_require__(5622);
-const fs = __nccwpck_require__(5747);
-const {promisify} = __nccwpck_require__(1669);
+const path = __nccwpck_require__(1017);
+const fs = __nccwpck_require__(7147);
+const {promisify} = __nccwpck_require__(3837);
 const pLocate = __nccwpck_require__(104);
 
 const fsStat = promisify(fs.stat);
@@ -55014,7 +56447,7 @@ exports.Zone = Zone;
 "use strict";
 
 
-const util = __nccwpck_require__(1669);
+const util = __nccwpck_require__(3837);
 const braces = __nccwpck_require__(610);
 const picomatch = __nccwpck_require__(8569);
 const utils = __nccwpck_require__(479);
@@ -55483,7 +56916,7 @@ module.exports = micromatch;
 
 /***/ }),
 
-/***/ 2695:
+/***/ 680:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
@@ -55492,12 +56925,12 @@ module.exports = npa
 module.exports.resolve = resolve
 module.exports.Result = Result
 
-const url = __nccwpck_require__(8835)
+const url = __nccwpck_require__(7310)
 const HostedGit = __nccwpck_require__(8869)
 const semver = __nccwpck_require__(1383)
-const path = global.FAKE_WINDOWS ? __nccwpck_require__(5622).win32 : __nccwpck_require__(5622)
+const path = global.FAKE_WINDOWS ? (__nccwpck_require__(1017).win32) : __nccwpck_require__(1017)
 const validatePackageName = __nccwpck_require__(4150)
-const { homedir } = __nccwpck_require__(2087)
+const { homedir } = __nccwpck_require__(2037)
 
 const isWindows = process.platform === 'win32' || global.FAKE_WINDOWS
 const hasSlashes = isWindows ? /\\|[/]/ : /[/]/
@@ -55509,30 +56942,32 @@ function npa (arg, where) {
   let name
   let spec
   if (typeof arg === 'object') {
-    if (arg instanceof Result && (!where || where === arg.where))
+    if (arg instanceof Result && (!where || where === arg.where)) {
       return arg
-    else if (arg.name && arg.rawSpec)
+    } else if (arg.name && arg.rawSpec) {
       return npa.resolve(arg.name, arg.rawSpec, where || arg.where)
-    else
+    } else {
       return npa(arg.raw, where || arg.where)
+    }
   }
   const nameEndsAt = arg[0] === '@' ? arg.slice(1).indexOf('@') + 1 : arg.indexOf('@')
   const namePart = nameEndsAt > 0 ? arg.slice(0, nameEndsAt) : arg
-  if (isURL.test(arg))
+  if (isURL.test(arg)) {
     spec = arg
-  else if (isGit.test(arg))
+  } else if (isGit.test(arg)) {
     spec = `git+ssh://${arg}`
-  else if (namePart[0] !== '@' && (hasSlashes.test(namePart) || isFilename.test(namePart)))
+  } else if (namePart[0] !== '@' && (hasSlashes.test(namePart) || isFilename.test(namePart))) {
     spec = arg
-  else if (nameEndsAt > 0) {
+  } else if (nameEndsAt > 0) {
     name = namePart
     spec = arg.slice(nameEndsAt + 1)
   } else {
     const valid = validatePackageName(arg)
-    if (valid.validForOldPackages)
+    if (valid.validForOldPackages) {
       name = arg
-    else
+    } else {
       spec = arg
+    }
   }
   return resolve(name, spec, where, arg)
 }
@@ -55547,35 +56982,41 @@ function resolve (name, spec, where, arg) {
     fromArgument: arg != null,
   })
 
-  if (name)
+  if (name) {
     res.setName(name)
+  }
 
-  if (spec && (isFilespec.test(spec) || /^file:/i.test(spec)))
+  if (spec && (isFilespec.test(spec) || /^file:/i.test(spec))) {
     return fromFile(res, where)
-  else if (spec && /^npm:/i.test(spec))
+  } else if (spec && /^npm:/i.test(spec)) {
     return fromAlias(res, where)
+  }
 
   const hosted = HostedGit.fromUrl(spec, {
     noGitPlus: true,
     noCommittish: true,
   })
-  if (hosted)
+  if (hosted) {
     return fromHostedGit(res, hosted)
-  else if (spec && isURL.test(spec))
+  } else if (spec && isURL.test(spec)) {
     return fromURL(res)
-  else if (spec && (hasSlashes.test(spec) || isFilename.test(spec)))
+  } else if (spec && (hasSlashes.test(spec) || isFilename.test(spec))) {
     return fromFile(res, where)
-  else
+  } else {
     return fromRegistry(res)
+  }
 }
 
-function invalidPackageName (name, valid) {
-  const err = new Error(`Invalid package name "${name}": ${valid.errors.join('; ')}`)
+function invalidPackageName (name, valid, raw) {
+  // eslint-disable-next-line max-len
+  const err = new Error(`Invalid package name "${name}" of package "${raw}": ${valid.errors.join('; ')}.`)
   err.code = 'EINVALIDPACKAGENAME'
   return err
 }
-function invalidTagName (name) {
-  const err = new Error(`Invalid tag name "${name}": Tags may not have any characters that encodeURIComponent encodes.`)
+
+function invalidTagName (name, raw) {
+  // eslint-disable-next-line max-len
+  const err = new Error(`Invalid tag name "${name}" of package "${raw}": Tags may not have any characters that encodeURIComponent encodes.`)
   err.code = 'EINVALIDTAGNAME'
   return err
 }
@@ -55584,10 +57025,11 @@ function Result (opts) {
   this.type = opts.type
   this.registry = opts.registry
   this.where = opts.where
-  if (opts.raw == null)
+  if (opts.raw == null) {
     this.raw = opts.name ? opts.name + '@' + opts.rawSpec : opts.rawSpec
-  else
+  } else {
     this.raw = opts.raw
+  }
 
   this.name = undefined
   this.escapedName = undefined
@@ -55595,8 +57037,9 @@ function Result (opts) {
   this.rawSpec = opts.rawSpec == null ? '' : opts.rawSpec
   this.saveSpec = opts.saveSpec
   this.fetchSpec = opts.fetchSpec
-  if (opts.name)
+  if (opts.name) {
     this.setName(opts.name)
+  }
   this.gitRange = opts.gitRange
   this.gitCommittish = opts.gitCommittish
   this.hosted = opts.hosted
@@ -55604,8 +57047,9 @@ function Result (opts) {
 
 Result.prototype.setName = function (name) {
   const valid = validatePackageName(name)
-  if (!valid.validForOldPackages)
-    throw invalidPackageName(name, valid)
+  if (!valid.validForOldPackages) {
+    throw invalidPackageName(name, valid, this.raw)
+  }
 
   this.name = name
   this.scope = name[0] === '@' ? name.slice(0, name.indexOf('/')) : undefined
@@ -55616,11 +57060,13 @@ Result.prototype.setName = function (name) {
 
 Result.prototype.toString = function () {
   const full = []
-  if (this.name != null && this.name !== '')
+  if (this.name != null && this.name !== '') {
     full.push(this.name)
+  }
   const spec = this.saveSpec || this.fetchSpec || this.rawSpec
-  if (spec != null && spec !== '')
+  if (spec != null && spec !== '') {
     full.push(spec)
+  }
   return full.length ? full.join('@') : this.raw
 }
 
@@ -55634,21 +57080,23 @@ function setGitCommittish (res, committish) {
   if (committish != null && committish.length >= 7 && committish.slice(0, 7) === 'semver:') {
     res.gitRange = decodeURIComponent(committish.slice(7))
     res.gitCommittish = null
-  } else
+  } else {
     res.gitCommittish = committish === '' ? null : committish
+  }
 
   return res
 }
 
 function fromFile (res, where) {
-  if (!where)
+  if (!where) {
     where = process.cwd()
+  }
   res.type = isFilename.test(res.rawSpec) ? 'file' : 'directory'
   res.where = where
 
   // always put the '/' on where when resolving urls, or else
   // file:foo from /path/to/bar goes to /path/to/foo, when we want
-  // it to be /path/to/foo/bar
+  // it to be /path/to/bar/foo
 
   let specUrl
   let resolvedUrl
@@ -55714,10 +57162,11 @@ function fromFile (res, where) {
   if (/^\/~(\/|$)/.test(specPath)) {
     res.saveSpec = `file:${specPath.substr(1)}`
     resolvedPath = path.resolve(homedir(), specPath.substr(3))
-  } else if (!path.isAbsolute(rawNoPrefix))
+  } else if (!path.isAbsolute(rawNoPrefix)) {
     res.saveSpec = `file:${path.relative(where, resolvedPath)}`
-  else
+  } else {
     res.saveSpec = `file:${path.resolve(resolvedPath)}`
+  }
 
   res.fetchSpec = path.resolve(where, resolvedPath)
   return res
@@ -55800,11 +57249,13 @@ function fromURL (res) {
 
 function fromAlias (res, where) {
   const subSpec = npa(res.rawSpec.substr(4), where)
-  if (subSpec.type === 'alias')
+  if (subSpec.type === 'alias') {
     throw new Error('nested aliases not supported')
+  }
 
-  if (!subSpec.registry)
+  if (!subSpec.registry) {
     throw new Error('aliases only work for registry deps')
+  }
 
   res.subSpec = subSpec
   res.registry = true
@@ -55823,116 +57274,18 @@ function fromRegistry (res) {
   res.fetchSpec = spec
   const version = semver.valid(spec, true)
   const range = semver.validRange(spec, true)
-  if (version)
+  if (version) {
     res.type = 'version'
-  else if (range)
+  } else if (range) {
     res.type = 'range'
-  else {
-    if (encodeURIComponent(spec) !== spec)
-      throw invalidTagName(spec)
-
+  } else {
+    if (encodeURIComponent(spec) !== spec) {
+      throw invalidTagName(spec, res.raw)
+    }
     res.type = 'tag'
   }
   return res
 }
-
-
-/***/ }),
-
-/***/ 7426:
-/***/ ((module) => {
-
-"use strict";
-/*
-object-assign
-(c) Sindre Sorhus
-@license MIT
-*/
-
-
-/* eslint-disable no-unused-vars */
-var getOwnPropertySymbols = Object.getOwnPropertySymbols;
-var hasOwnProperty = Object.prototype.hasOwnProperty;
-var propIsEnumerable = Object.prototype.propertyIsEnumerable;
-
-function toObject(val) {
-	if (val === null || val === undefined) {
-		throw new TypeError('Object.assign cannot be called with null or undefined');
-	}
-
-	return Object(val);
-}
-
-function shouldUseNative() {
-	try {
-		if (!Object.assign) {
-			return false;
-		}
-
-		// Detect buggy property enumeration order in older V8 versions.
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
-		var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
-		test1[5] = 'de';
-		if (Object.getOwnPropertyNames(test1)[0] === '5') {
-			return false;
-		}
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-		var test2 = {};
-		for (var i = 0; i < 10; i++) {
-			test2['_' + String.fromCharCode(i)] = i;
-		}
-		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
-			return test2[n];
-		});
-		if (order2.join('') !== '0123456789') {
-			return false;
-		}
-
-		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
-		var test3 = {};
-		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
-			test3[letter] = letter;
-		});
-		if (Object.keys(Object.assign({}, test3)).join('') !==
-				'abcdefghijklmnopqrst') {
-			return false;
-		}
-
-		return true;
-	} catch (err) {
-		// We don't expect any of the above to throw, but better to be safe.
-		return false;
-	}
-}
-
-module.exports = shouldUseNative() ? Object.assign : function (target, source) {
-	var from;
-	var to = toObject(target);
-	var symbols;
-
-	for (var s = 1; s < arguments.length; s++) {
-		from = Object(arguments[s]);
-
-		for (var key in from) {
-			if (hasOwnProperty.call(from, key)) {
-				to[key] = from[key];
-			}
-		}
-
-		if (getOwnPropertySymbols) {
-			symbols = getOwnPropertySymbols(from);
-			for (var i = 0; i < symbols.length; i++) {
-				if (propIsEnumerable.call(from, symbols[i])) {
-					to[symbols[i]] = from[symbols[i]];
-				}
-			}
-		}
-	}
-
-	return to;
-};
 
 
 /***/ }),
@@ -56079,8 +57432,8 @@ module.exports = pLocate;
 
 "use strict";
 
-const fs = __nccwpck_require__(5747);
-const {promisify} = __nccwpck_require__(1669);
+const fs = __nccwpck_require__(7147);
+const {promisify} = __nccwpck_require__(3837);
 
 const pAccess = promisify(fs.access);
 
@@ -56124,7 +57477,7 @@ function matchNetworkDrive02(input) {
     return input.match(/^\\\\([^\\/]+)[\\/]([^\\/]+)[\\/]?$/);
 }
 exports.matchNetworkDrive02 = matchNetworkDrive02;
-exports.default = pathIsNetworkDrive;
+exports["default"] = pathIsNetworkDrive;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -56142,7 +57495,7 @@ function pathStripSep(input) {
         .replace(/(^[/\\])[/\\]{2,}$/, '$1');
 }
 exports.pathStripSep = pathStripSep;
-exports.default = pathStripSep;
+exports["default"] = pathStripSep;
 //# sourceMappingURL=index.js.map
 
 /***/ }),
@@ -56164,7 +57517,7 @@ module.exports = __nccwpck_require__(3322);
 "use strict";
 
 
-const path = __nccwpck_require__(5622);
+const path = __nccwpck_require__(1017);
 const WIN_SLASH = '\\\\/';
 const WIN_NO_SLASH = `[^${WIN_SLASH}]`;
 
@@ -56601,7 +57954,14 @@ const parse = (input, options) => {
       }
 
       if (token.inner.includes('*') && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
-        output = token.close = `)${rest})${extglobStar})`;
+        // Any non-magical string (`.ts`) or even nested expression (`.{ts,tsx}`) can follow after the closing parenthesis.
+        // In this case, we need to parse the string and use it in the output of the original pattern.
+        // Suitable patterns: `/!(*.d).ts`, `/!(*.d).{ts,tsx}`, `**/!(*-dbg).@(js)`.
+        //
+        // Disabling the `fastpaths` option due to a problem with parsing strings as `.ts` in the pattern like `**/!(*.d).ts`.
+        const expression = parse(rest, { ...options, fastpaths: false }).output;
+
+        output = token.close = `)${expression})${extglobStar})`;
       }
 
       if (token.prev.type === 'bos') {
@@ -57443,7 +58803,7 @@ module.exports = parse;
 "use strict";
 
 
-const path = __nccwpck_require__(5622);
+const path = __nccwpck_require__(1017);
 const scan = __nccwpck_require__(2429);
 const parse = __nccwpck_require__(2139);
 const utils = __nccwpck_require__(479);
@@ -58192,7 +59552,7 @@ module.exports = scan;
 "use strict";
 
 
-const path = __nccwpck_require__(5622);
+const path = __nccwpck_require__(1017);
 const win32 = process.platform === 'win32';
 const {
   REGEX_BACKSLASH,
@@ -58263,7 +59623,7 @@ exports.wrapOutput = (input, state = {}, options = {}) => {
 
 "use strict";
 
-const path = __nccwpck_require__(5622);
+const path = __nccwpck_require__(1017);
 const findUp = __nccwpck_require__(9486);
 
 const pkgDir = async cwd => {
@@ -59591,7 +60951,7 @@ module.exports = prerelease
 
 /***/ }),
 
-/***/ 7499:
+/***/ 6417:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const compare = __nccwpck_require__(4309)
@@ -59660,10 +61020,10 @@ module.exports = {
   re: internalRe.re,
   src: internalRe.src,
   tokens: internalRe.t,
-  SEMVER_SPEC_VERSION: __nccwpck_require__(2293).SEMVER_SPEC_VERSION,
+  SEMVER_SPEC_VERSION: (__nccwpck_require__(2293).SEMVER_SPEC_VERSION),
   SemVer: __nccwpck_require__(8088),
-  compareIdentifiers: __nccwpck_require__(2463).compareIdentifiers,
-  rcompareIdentifiers: __nccwpck_require__(2463).rcompareIdentifiers,
+  compareIdentifiers: (__nccwpck_require__(2463).compareIdentifiers),
+  rcompareIdentifiers: (__nccwpck_require__(2463).rcompareIdentifiers),
   parse: __nccwpck_require__(5925),
   valid: __nccwpck_require__(9601),
   clean: __nccwpck_require__(8848),
@@ -59674,7 +61034,7 @@ module.exports = {
   patch: __nccwpck_require__(2866),
   prerelease: __nccwpck_require__(4016),
   compare: __nccwpck_require__(4309),
-  rcompare: __nccwpck_require__(7499),
+  rcompare: __nccwpck_require__(6417),
   compareLoose: __nccwpck_require__(2804),
   compareBuild: __nccwpck_require__(2156),
   sort: __nccwpck_require__(1426),
@@ -60599,7 +61959,7 @@ const stringWidth = string => {
 
 module.exports = stringWidth;
 // TODO: remove this in the next major version
-module.exports.default = stringWidth;
+module.exports["default"] = stringWidth;
 
 
 /***/ }),
@@ -60621,7 +61981,7 @@ module.exports = string => typeof string === 'string' ? string.replace(ansiRegex
 
 "use strict";
 
-const os = __nccwpck_require__(2087);
+const os = __nccwpck_require__(2037);
 const hasFlag = __nccwpck_require__(1621);
 
 const env = process.env;
@@ -61266,7 +62626,7 @@ var __createBinding;
                 ar[i] = from[i];
             }
         }
-        return to.concat(ar || from);
+        return to.concat(ar || Array.prototype.slice.call(from));
     };
 
     __await = function (v) {
@@ -61360,6 +62720,286 @@ var __createBinding;
     exporter("__classPrivateFieldGet", __classPrivateFieldGet);
     exporter("__classPrivateFieldSet", __classPrivateFieldSet);
 });
+
+
+/***/ }),
+
+/***/ 4294:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+module.exports = __nccwpck_require__(4219);
+
+
+/***/ }),
+
+/***/ 4219:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+var net = __nccwpck_require__(1808);
+var tls = __nccwpck_require__(4404);
+var http = __nccwpck_require__(3685);
+var https = __nccwpck_require__(5687);
+var events = __nccwpck_require__(2361);
+var assert = __nccwpck_require__(9491);
+var util = __nccwpck_require__(3837);
+
+
+exports.httpOverHttp = httpOverHttp;
+exports.httpsOverHttp = httpsOverHttp;
+exports.httpOverHttps = httpOverHttps;
+exports.httpsOverHttps = httpsOverHttps;
+
+
+function httpOverHttp(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = http.request;
+  return agent;
+}
+
+function httpsOverHttp(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = http.request;
+  agent.createSocket = createSecureSocket;
+  agent.defaultPort = 443;
+  return agent;
+}
+
+function httpOverHttps(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = https.request;
+  return agent;
+}
+
+function httpsOverHttps(options) {
+  var agent = new TunnelingAgent(options);
+  agent.request = https.request;
+  agent.createSocket = createSecureSocket;
+  agent.defaultPort = 443;
+  return agent;
+}
+
+
+function TunnelingAgent(options) {
+  var self = this;
+  self.options = options || {};
+  self.proxyOptions = self.options.proxy || {};
+  self.maxSockets = self.options.maxSockets || http.Agent.defaultMaxSockets;
+  self.requests = [];
+  self.sockets = [];
+
+  self.on('free', function onFree(socket, host, port, localAddress) {
+    var options = toOptions(host, port, localAddress);
+    for (var i = 0, len = self.requests.length; i < len; ++i) {
+      var pending = self.requests[i];
+      if (pending.host === options.host && pending.port === options.port) {
+        // Detect the request to connect same origin server,
+        // reuse the connection.
+        self.requests.splice(i, 1);
+        pending.request.onSocket(socket);
+        return;
+      }
+    }
+    socket.destroy();
+    self.removeSocket(socket);
+  });
+}
+util.inherits(TunnelingAgent, events.EventEmitter);
+
+TunnelingAgent.prototype.addRequest = function addRequest(req, host, port, localAddress) {
+  var self = this;
+  var options = mergeOptions({request: req}, self.options, toOptions(host, port, localAddress));
+
+  if (self.sockets.length >= this.maxSockets) {
+    // We are over limit so we'll add it to the queue.
+    self.requests.push(options);
+    return;
+  }
+
+  // If we are under maxSockets create a new one.
+  self.createSocket(options, function(socket) {
+    socket.on('free', onFree);
+    socket.on('close', onCloseOrRemove);
+    socket.on('agentRemove', onCloseOrRemove);
+    req.onSocket(socket);
+
+    function onFree() {
+      self.emit('free', socket, options);
+    }
+
+    function onCloseOrRemove(err) {
+      self.removeSocket(socket);
+      socket.removeListener('free', onFree);
+      socket.removeListener('close', onCloseOrRemove);
+      socket.removeListener('agentRemove', onCloseOrRemove);
+    }
+  });
+};
+
+TunnelingAgent.prototype.createSocket = function createSocket(options, cb) {
+  var self = this;
+  var placeholder = {};
+  self.sockets.push(placeholder);
+
+  var connectOptions = mergeOptions({}, self.proxyOptions, {
+    method: 'CONNECT',
+    path: options.host + ':' + options.port,
+    agent: false,
+    headers: {
+      host: options.host + ':' + options.port
+    }
+  });
+  if (options.localAddress) {
+    connectOptions.localAddress = options.localAddress;
+  }
+  if (connectOptions.proxyAuth) {
+    connectOptions.headers = connectOptions.headers || {};
+    connectOptions.headers['Proxy-Authorization'] = 'Basic ' +
+        new Buffer(connectOptions.proxyAuth).toString('base64');
+  }
+
+  debug('making CONNECT request');
+  var connectReq = self.request(connectOptions);
+  connectReq.useChunkedEncodingByDefault = false; // for v0.6
+  connectReq.once('response', onResponse); // for v0.6
+  connectReq.once('upgrade', onUpgrade);   // for v0.6
+  connectReq.once('connect', onConnect);   // for v0.7 or later
+  connectReq.once('error', onError);
+  connectReq.end();
+
+  function onResponse(res) {
+    // Very hacky. This is necessary to avoid http-parser leaks.
+    res.upgrade = true;
+  }
+
+  function onUpgrade(res, socket, head) {
+    // Hacky.
+    process.nextTick(function() {
+      onConnect(res, socket, head);
+    });
+  }
+
+  function onConnect(res, socket, head) {
+    connectReq.removeAllListeners();
+    socket.removeAllListeners();
+
+    if (res.statusCode !== 200) {
+      debug('tunneling socket could not be established, statusCode=%d',
+        res.statusCode);
+      socket.destroy();
+      var error = new Error('tunneling socket could not be established, ' +
+        'statusCode=' + res.statusCode);
+      error.code = 'ECONNRESET';
+      options.request.emit('error', error);
+      self.removeSocket(placeholder);
+      return;
+    }
+    if (head.length > 0) {
+      debug('got illegal response body from proxy');
+      socket.destroy();
+      var error = new Error('got illegal response body from proxy');
+      error.code = 'ECONNRESET';
+      options.request.emit('error', error);
+      self.removeSocket(placeholder);
+      return;
+    }
+    debug('tunneling connection has established');
+    self.sockets[self.sockets.indexOf(placeholder)] = socket;
+    return cb(socket);
+  }
+
+  function onError(cause) {
+    connectReq.removeAllListeners();
+
+    debug('tunneling socket could not be established, cause=%s\n',
+          cause.message, cause.stack);
+    var error = new Error('tunneling socket could not be established, ' +
+                          'cause=' + cause.message);
+    error.code = 'ECONNRESET';
+    options.request.emit('error', error);
+    self.removeSocket(placeholder);
+  }
+};
+
+TunnelingAgent.prototype.removeSocket = function removeSocket(socket) {
+  var pos = this.sockets.indexOf(socket)
+  if (pos === -1) {
+    return;
+  }
+  this.sockets.splice(pos, 1);
+
+  var pending = this.requests.shift();
+  if (pending) {
+    // If we have pending requests and a socket gets closed a new one
+    // needs to be created to take over in the pool for the one that closed.
+    this.createSocket(pending, function(socket) {
+      pending.request.onSocket(socket);
+    });
+  }
+};
+
+function createSecureSocket(options, cb) {
+  var self = this;
+  TunnelingAgent.prototype.createSocket.call(self, options, function(socket) {
+    var hostHeader = options.request.getHeader('host');
+    var tlsOptions = mergeOptions({}, self.options, {
+      socket: socket,
+      servername: hostHeader ? hostHeader.replace(/:.*$/, '') : options.host
+    });
+
+    // 0 is dummy port for v0.6
+    var secureSocket = tls.connect(0, tlsOptions);
+    self.sockets[self.sockets.indexOf(socket)] = secureSocket;
+    cb(secureSocket);
+  });
+}
+
+
+function toOptions(host, port, localAddress) {
+  if (typeof host === 'string') { // since v0.10
+    return {
+      host: host,
+      port: port,
+      localAddress: localAddress
+    };
+  }
+  return host; // for v0.11 or later
+}
+
+function mergeOptions(target) {
+  for (var i = 1, len = arguments.length; i < len; ++i) {
+    var overrides = arguments[i];
+    if (typeof overrides === 'object') {
+      var keys = Object.keys(overrides);
+      for (var j = 0, keyLen = keys.length; j < keyLen; ++j) {
+        var k = keys[j];
+        if (overrides[k] !== undefined) {
+          target[k] = overrides[k];
+        }
+      }
+    }
+  }
+  return target;
+}
+
+
+var debug;
+if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
+  debug = function() {
+    var args = Array.prototype.slice.call(arguments);
+    if (typeof args[0] === 'string') {
+      args[0] = 'TUNNEL: ' + args[0];
+    } else {
+      args.unshift('TUNNEL:');
+    }
+    console.error.apply(console, args);
+  }
+} else {
+  debug = function() {};
+}
+exports.debug = debug; // for test
 
 
 /***/ }),
@@ -61769,11 +63409,10 @@ return typeDetect;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports._this_origin = exports.fn = exports.upath = exports.win32 = exports.posix = exports.PathWrap = void 0;
 const tslib_1 = __nccwpck_require__(4351);
-const path_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(5622));
-const lodash_1 = __nccwpck_require__(250);
+const path_1 = tslib_1.__importDefault(__nccwpck_require__(1017));
 const type_1 = __nccwpck_require__(7055);
 const util_1 = __nccwpck_require__(3752);
-const path_is_network_drive_1 = (0, tslib_1.__importStar)(__nccwpck_require__(8943));
+const path_is_network_drive_1 = __nccwpck_require__(8943);
 const fix_1 = __nccwpck_require__(4829);
 class PathWrap {
     constructor(path, id) {
@@ -61782,7 +63421,7 @@ class PathWrap {
         this.node = path_1.default;
         let _static = (0, util_1.getStatic)(this);
         // @ts-ignore
-        this.fn = (0, lodash_1.defaults)(this.__proto__, _static.fn, path);
+        this.fn = (0, util_1.defaults)(this.__proto__, _static.fn, path);
         this.delimiter = (_a = path.delimiter) !== null && _a !== void 0 ? _a : _static.fn.delimiter;
         [
             'join',
@@ -61908,7 +63547,7 @@ for (const [key, lib] of [
 Object.defineProperty(exports.upath, "__esModule", { value: true });
 // @ts-ignore
 //export default upath as PathWrap & IPath & IPathNode;
-exports.default = exports.upath;
+exports["default"] = exports.upath;
 function _this_origin(who) {
     if (who[type_1.ORIGIN_KEY]) {
         // @ts-ignore
@@ -62020,10 +63659,10 @@ exports.ORIGIN_KEY = Symbol.for('_origin');
  * Created by user on 2020/6/9.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getStatic = exports._replace_sep = exports._strip_sep = void 0;
+exports.defaults = exports.getStatic = exports._replace_sep = exports._strip_sep = void 0;
 const tslib_1 = __nccwpck_require__(4351);
-const path_is_network_drive_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(8943));
-const path_strip_sep_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(5094));
+const path_is_network_drive_1 = tslib_1.__importDefault(__nccwpck_require__(8943));
+const path_strip_sep_1 = tslib_1.__importDefault(__nccwpck_require__(5094));
 exports._strip_sep = path_strip_sep_1.default;
 function _replace_sep(who, input) {
     let sep = who.sep;
@@ -62048,6 +63687,18 @@ function getStatic(who) {
     return who.__proto__.constructor;
 }
 exports.getStatic = getStatic;
+function defaults(destination, ...input) {
+    destination = destination || {};
+    input.forEach(defaults => {
+        for (const key in defaults) {
+            if (defaults.hasOwnProperty(key) && !destination.hasOwnProperty(key)) {
+                destination[key] = defaults[key];
+            }
+        }
+    });
+    return destination;
+}
+exports.defaults = defaults;
 //# sourceMappingURL=util.js.map
 
 /***/ }),
@@ -62059,7 +63710,7 @@ exports.getStatic = getStatic;
 
 
 var scopedPackagePattern = new RegExp('^(?:@([^/]+?)[/])?([^/]+?)$')
-var builtins = __nccwpck_require__(2008)
+var builtins = __nccwpck_require__(2587)
 var blacklist = [
   'node_modules',
   'favicon.ico'
@@ -64175,10 +65826,10 @@ module.exports = {
   re: internalRe.re,
   src: internalRe.src,
   tokens: internalRe.t,
-  SEMVER_SPEC_VERSION: __nccwpck_require__(9275).SEMVER_SPEC_VERSION,
+  SEMVER_SPEC_VERSION: (__nccwpck_require__(9275).SEMVER_SPEC_VERSION),
   SemVer: __nccwpck_require__(7775),
-  compareIdentifiers: __nccwpck_require__(9562).compareIdentifiers,
-  rcompareIdentifiers: __nccwpck_require__(9562).rcompareIdentifiers,
+  compareIdentifiers: (__nccwpck_require__(9562).compareIdentifiers),
+  rcompareIdentifiers: (__nccwpck_require__(9562).rcompareIdentifiers),
   parse: __nccwpck_require__(5860),
   valid: __nccwpck_require__(8423),
   clean: __nccwpck_require__(29),
@@ -65019,15 +66670,7 @@ module.exports = Queue;
 
 /***/ }),
 
-/***/ 2008:
-/***/ ((module) => {
-
-"use strict";
-module.exports = JSON.parse('["assert","buffer","child_process","cluster","console","constants","crypto","dgram","dns","domain","events","fs","http","https","module","net","os","path","process","punycode","querystring","readline","repl","stream","string_decoder","timers","tls","tty","url","util","v8","vm","zlib"]');
-
-/***/ }),
-
-/***/ 2357:
+/***/ 9491:
 /***/ ((module) => {
 
 "use strict";
@@ -65035,7 +66678,7 @@ module.exports = require("assert");
 
 /***/ }),
 
-/***/ 4293:
+/***/ 4300:
 /***/ ((module) => {
 
 "use strict";
@@ -65043,7 +66686,7 @@ module.exports = require("buffer");
 
 /***/ }),
 
-/***/ 7082:
+/***/ 6206:
 /***/ ((module) => {
 
 "use strict";
@@ -65051,7 +66694,7 @@ module.exports = require("console");
 
 /***/ }),
 
-/***/ 6417:
+/***/ 6113:
 /***/ ((module) => {
 
 "use strict";
@@ -65059,7 +66702,7 @@ module.exports = require("crypto");
 
 /***/ }),
 
-/***/ 8614:
+/***/ 2361:
 /***/ ((module) => {
 
 "use strict";
@@ -65067,7 +66710,7 @@ module.exports = require("events");
 
 /***/ }),
 
-/***/ 5747:
+/***/ 7147:
 /***/ ((module) => {
 
 "use strict";
@@ -65075,7 +66718,31 @@ module.exports = require("fs");
 
 /***/ }),
 
-/***/ 2087:
+/***/ 3685:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("http");
+
+/***/ }),
+
+/***/ 5687:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("https");
+
+/***/ }),
+
+/***/ 1808:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("net");
+
+/***/ }),
+
+/***/ 2037:
 /***/ ((module) => {
 
 "use strict";
@@ -65083,7 +66750,7 @@ module.exports = require("os");
 
 /***/ }),
 
-/***/ 5622:
+/***/ 1017:
 /***/ ((module) => {
 
 "use strict";
@@ -65091,7 +66758,7 @@ module.exports = require("path");
 
 /***/ }),
 
-/***/ 2413:
+/***/ 2781:
 /***/ ((module) => {
 
 "use strict";
@@ -65099,7 +66766,15 @@ module.exports = require("stream");
 
 /***/ }),
 
-/***/ 3867:
+/***/ 4404:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("tls");
+
+/***/ }),
+
+/***/ 6224:
 /***/ ((module) => {
 
 "use strict";
@@ -65107,7 +66782,7 @@ module.exports = require("tty");
 
 /***/ }),
 
-/***/ 8835:
+/***/ 7310:
 /***/ ((module) => {
 
 "use strict";
@@ -65115,11 +66790,119 @@ module.exports = require("url");
 
 /***/ }),
 
-/***/ 1669:
+/***/ 3837:
 /***/ ((module) => {
 
 "use strict";
 module.exports = require("util");
+
+/***/ }),
+
+/***/ 6347:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+
+if (process.env.NODE_ENV === 'production') {
+  module.exports = __nccwpck_require__(2319)
+} else {
+  module.exports = __nccwpck_require__(6187)
+}
+
+
+/***/ }),
+
+/***/ 6187:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+exports.EnumLineBreak = void 0;
+
+(function (EnumLineBreak) {
+  EnumLineBreak["CR"] = "\r";
+  EnumLineBreak["CRLF"] = "\r\n";
+  EnumLineBreak["LF"] = "\n";
+})(exports.EnumLineBreak || (exports.EnumLineBreak = {}));
+
+const CR = "\r";
+const CRLF = "\r\n";
+const LF = "\n";
+const R_CRLF = /\r\n|\r(?!\n)|\n/g;
+function crlf(text, newline = "\n") {
+  return text.replace(R_CRLF, newline);
+}
+function chkcrlf(text, options) {
+  var _options$disable;
+
+  const disable = (_options$disable = options === null || options === void 0 ? void 0 : options.disable) !== null && _options$disable !== void 0 ? _options$disable : {};
+  return {
+    lf: !disable.lf && /\n/.test(text.replace(/\r\n/g, '')),
+    crlf: !disable.crlf && /\r\n/.test(text),
+    cr: !disable.cr && /\r(?!\n)/.test(text)
+  };
+}
+function detectLineBreak(text, options) {
+  const _lb = chkcrlf(text, options);
+
+  return _lb.crlf ? "\r\n" : _lb.lf || !_lb.cr ? "\n" : "\r";
+}
+function isCRLF(newline) {
+  return newline === "\r\n";
+}
+function isLF(newline) {
+  return newline === "\n";
+}
+function isCR(newline) {
+  return newline === "\r";
+}
+function lineSplit(text) {
+  return text.split(R_CRLF);
+}
+function crlf_unicode_normalize(text, newline = "\n") {
+  const ln3 = newline + newline + newline;
+  const ln2 = newline + newline;
+  return text.replace(/\u000C/g, ln3).replace(/\u2028/g, newline).replace(/\u2029/g, ln2);
+}
+
+exports.CR = CR;
+exports.CRLF = CRLF;
+exports.LF = LF;
+exports.R_CRLF = R_CRLF;
+exports.chkcrlf = chkcrlf;
+exports.crlf = crlf;
+exports.crlf_unicode_normalize = crlf_unicode_normalize;
+exports["default"] = crlf;
+exports.detectLineBreak = detectLineBreak;
+exports.isCR = isCR;
+exports.isCRLF = isCRLF;
+exports.isLF = isLF;
+exports.lineSplit = lineSplit;
+//# sourceMappingURL=index.cjs.development.cjs.map
+
+
+/***/ }),
+
+/***/ 2319:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+var r;Object.defineProperty(exports, "__esModule", ({value:!0})),exports.EnumLineBreak=void 0,(r=exports.EnumLineBreak||(exports.EnumLineBreak={})).CR="\r",r.CRLF="\r\n",r.LF="\n";const e=/\r\n|\r(?!\n)|\n/g;function n(r,n="\n"){return r.replace(e,n)}function t(r,e){var n;const t=null!==(n=null==e?void 0:e.disable)&&void 0!==n?n:{};return{lf:!t.lf&&/\n/.test(r.replace(/\r\n/g,"")),crlf:!t.crlf&&/\r\n/.test(r),cr:!t.cr&&/\r(?!\n)/.test(r)}}exports.CR="\r",exports.CRLF="\r\n",exports.LF="\n",exports.R_CRLF=e,exports.chkcrlf=t,exports.crlf=n,exports.crlf_unicode_normalize=function(r,e="\n"){const n=e+e;return r.replace(/\u000C/g,e+e+e).replace(/\u2028/g,e).replace(/\u2029/g,n)},exports["default"]=n,exports.detectLineBreak=function(r,e){const n=t(r,e);return n.crlf?"\r\n":n.lf||!n.cr?"\n":"\r"},exports.isCR=function(r){return"\r"===r},exports.isCRLF=function(r){return"\r\n"===r},exports.isLF=function(r){return"\n"===r},exports.lineSplit=function(r){return r.split(e)};
+//# sourceMappingURL=index.cjs.production.min.cjs.map
+
+
+/***/ }),
+
+/***/ 2587:
+/***/ ((module) => {
+
+"use strict";
+module.exports = JSON.parse('["assert","buffer","child_process","cluster","console","constants","crypto","dgram","dns","domain","events","fs","http","https","module","net","os","path","process","punycode","querystring","readline","repl","stream","string_decoder","timers","tls","tty","url","util","v8","vm","zlib"]');
 
 /***/ })
 
@@ -65181,9 +66964,9 @@ var exports = __webpack_exports__;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const tslib_1 = __nccwpck_require__(4351);
-const core = (0, tslib_1.__importStar)(__nccwpck_require__(2186));
+const core = tslib_1.__importStar(__nccwpck_require__(2186));
 const fn_1 = __nccwpck_require__(3255);
-const yarnlock_diff_1 = (0, tslib_1.__importDefault)(__nccwpck_require__(5506));
+const yarnlock_diff_1 = tslib_1.__importDefault(__nccwpck_require__(5506));
 async function run() {
     try {
         core.debug(new Date().toTimeString());
@@ -65208,7 +66991,7 @@ async function run() {
         core.setFailed(error.message);
     }
 }
-exports.default = run();
+exports["default"] = run();
 //# sourceMappingURL=main.js.map
 })();
 
